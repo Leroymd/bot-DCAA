@@ -1,0 +1,43 @@
+{
+  "apiKey": "bg_bff08721949c2aef87294000b6f114df",
+  "apiSecret": "8082e6f32b795a5a6a69f13f4d2a4b646fb6a28cc8a52668073031aa6ca30068",
+  "passphrase": "Workinday13",
+  "demo": false,
+  "strategy": "fractal",
+  "tradingPairs": [
+    "BTCUSDT"
+  ],
+  "maxTradingPairs": 5,
+  "pacLength": 34,
+  "fastEMAlength": 89,
+  "mediumEMAlength": 200,
+  "slowEMAlength": 600,
+  "useHAcandles": true,
+  "useRegularFractals": false,
+  "pullbackLookback": 3,
+  "positionSize": 30,
+  "leverage": 5,
+  "takeProfitPercentage": 2.5,
+  "stopLossPercentage": 1.5,
+  "maxTradeDurationMinutes": 5,
+  "trailingStop": {
+    "enabled": true,
+    "activationPercentage": 90,
+    "stopDistance": 0.5
+  },
+  "partialClose": {
+    "enabled": true,
+    "level1": 1.4,
+    "amount1": 30,
+    "level2": 2,
+    "amount2": 50
+  },
+  "riskManagement": {
+    "maxOpenPositions": 3,
+    "dailyLossLimit": 10
+  },
+  "reinvestment": 80,
+  "withdrawalThreshold": 50,
+  "withdrawalPercentage": 20,
+  "debug": false
+}
