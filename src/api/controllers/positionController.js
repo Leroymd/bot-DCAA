@@ -191,3 +191,31 @@ exports.closePosition = async function(req, res) {
     });
   }
 };
+
+// Добавляем метод getActivePositions, который был вызван в маршруте, но не был определен
+exports.getActivePositions = async function(req, res) {
+  try {
+    const tradingBot = getBot();
+    
+    if (!tradingBot || !tradingBot.positionManager) {
+      return res.status(500).json({
+        success: false,
+        message: 'Торговый бот не инициализирован или отсутствует менеджер позиций'
+      });
+    }
+    
+    // Получаем все открытые позиции
+    const positions = await tradingBot.positionManager.updateOpenPositions();
+    
+    return res.json({
+      success: true,
+      data: positions
+    });
+  } catch (error) {
+    logger.error(`Ошибка при получении активных позиций: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
