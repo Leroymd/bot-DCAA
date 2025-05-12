@@ -1,4 +1,3 @@
-// 3. Обновление FractalStrategy.js
 // src/bot/strategy/FractalStrategy.js
 const logger = require('../../utils/logger');
 

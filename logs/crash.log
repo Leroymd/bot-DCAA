@@ -1,0 +1,9 @@
+2025-05-12T14:20:36.184Z Uncaught Exception: listen EADDRINUSE: address already in use :::5000
+Error: listen EADDRINUSE: address already in use :::5000
+    at Server.setupListenHandle [as _listen2] (node:net:1939:16)
+    at listenInCluster (node:net:1996:12)
+    at Server.listen (node:net:2101:7)
+    at app.listen (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\application.js:635:24)
+    at C:\Users\leroy\Desktop\bot-DCA\app.js:92:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+

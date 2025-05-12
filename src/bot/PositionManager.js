@@ -94,119 +94,122 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  async openPosition(type, symbol, price, reason, confidenceLevel) {
-    try {
-      if (!this.client || !price) {
-        logger.error('Не удалось открыть позицию: отсутствует клиент API или цена.');
-        return null;
-      }
-      
-      // Определяем размер позиции на основе баланса и процента риска
-      const accountInfoResponse = await this.client.getAccountAssets();
-      if (!accountInfoResponse || !accountInfoResponse.data || accountInfoResponse.data.length === 0) {
-        logger.error('Не удалось получить информацию о балансе аккаунта');
-        return null;
-      }
-      
-      const availableBalance = parseFloat(accountInfoResponse.data[0].available);
-      const positionSizeUSDT = (availableBalance * this.config.positionSize) / 100;
-      
-      if (positionSizeUSDT < 5) {
-        logger.warn(`Слишком маленький размер позиции: ${positionSizeUSDT}. Минимум 5 USDT.`);
-        return null;
-      }
-      
-      // Определяем количество контрактов на основе цены
-      const contractSize = positionSizeUSDT / price;
-      
-      // Устанавливаем плечо для символа
-      await this.client.setLeverage(symbol, 'isolated', this.config.leverage.toString());
-      
-      // Определяем сторону ордера на основе типа позиции
-      const side = type === 'LONG' ? 'buy' : 'sell';
-      
-      // Открываем позицию через API
-      const orderResponse = await this.client.placeOrder(
-        symbol,
-        side,
-        'market',
-        contractSize.toFixed(5),
-        null,
-        false,
-        'open'
-      );
-      
-      if (!orderResponse || !orderResponse.data || orderResponse.code !== '00000') {
-        logger.error(`Ошибка при открытии позиции: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
-        return null;
-      }
-      
-      logger.info(`Позиция успешно открыта: ${type} ${symbol} по цене ${price}`);
-      
-      // Получаем ID позиции
-      const positionId = orderResponse.data.orderId;
-      
-      // Создаем новую запись о позиции
-      const newPosition = {
-        id: positionId,
-        symbol: symbol,
-        type: type,
-        entryPrice: price,
-        size: contractSize,
-        entryTime: new Date().getTime(),
-        confidenceLevel: confidenceLevel || 0
-      };
-      
-      // Устанавливаем стоп-лосс и тейк-профит
-      if (this.config.stopLossPercentage > 0) {
-        const stopPrice = type === 'LONG' 
-          ? price * (1 - this.config.stopLossPercentage / 100) 
-          : price * (1 + this.config.stopLossPercentage / 100);
-        
-        await this.client.setTpsl(
-          symbol, 
-          type.toLowerCase(), 
-          'loss_plan', 
-          stopPrice.toFixed(5), 
-          contractSize.toFixed(5)
-        );
-        
-        logger.info(`Установлен стоп-лосс для ${symbol} на уровне ${stopPrice.toFixed(5)}`);
-      }
-      
-      if (this.config.takeProfitPercentage > 0) {
-        const takeProfitPrice = type === 'LONG' 
-          ? price * (1 + this.config.takeProfitPercentage / 100) 
-          : price * (1 - this.config.takeProfitPercentage / 100);
-        
-        await this.client.setTpsl(
-          symbol, 
-          type.toLowerCase(), 
-          'profit_plan', 
-          takeProfitPrice.toFixed(5), 
-          contractSize.toFixed(5)
-        );
-        
-        logger.info(`Установлен тейк-профит для ${symbol} на уровне ${takeProfitPrice.toFixed(5)}`);
-      }
-      
-      // Добавляем позицию в список открытых
-      this.openPositions.push(newPosition);
-      
-      // Добавляем позицию в историю
-      this.positionHistory.push({
-        ...newPosition,
-        status: 'open',
-        reason: reason || 'Сигнал стратегии'
-      });
-      
-      this.emit('position_opened', newPosition);
-      return newPosition;
-    } catch (error) {
-      logger.error('Ошибка при открытии позиции: ' + error.message);
+  // Исправления в методе openPosition класса PositionManager
+
+async openPosition(type, symbol, price, reason, confidenceLevel) {
+  try {
+    if (!this.client || !price) {
+      logger.error('Не удалось открыть позицию: отсутствует клиент API или цена.');
       return null;
     }
+    
+    // Определяем размер позиции на основе баланса и процента риска
+    // Используем getAccountAssets вместо getAccountInfo
+    const accountInfoResponse = await this.client.getAccountAssets();
+    if (!accountInfoResponse || !accountInfoResponse.data || accountInfoResponse.data.length === 0) {
+      logger.error('Не удалось получить информацию о балансе аккаунта');
+      return null;
+    }
+    
+    const availableBalance = parseFloat(accountInfoResponse.data[0].available);
+    const positionSizeUSDT = (availableBalance * this.config.positionSize) / 100;
+    
+    if (positionSizeUSDT < 5) {
+      logger.warn(`Слишком маленький размер позиции: ${positionSizeUSDT}. Минимум 5 USDT.`);
+      return null;
+    }
+    
+    // Определяем количество контрактов на основе цены
+    const contractSize = positionSizeUSDT / price;
+    
+    // Устанавливаем плечо для символа
+    await this.client.setLeverage(symbol, 'isolated', this.config.leverage.toString());
+    
+    // Определяем сторону ордера на основе типа позиции
+    const side = type === 'LONG' ? 'buy' : 'sell';
+    
+    // Открываем позицию через API
+    const orderResponse = await this.client.placeOrder(
+      symbol,
+      side,
+      'market',
+      contractSize.toFixed(5),
+      null,
+      false,
+      'open'
+    );
+    
+    if (!orderResponse || !orderResponse.data || orderResponse.code !== '00000') {
+      logger.error(`Ошибка при открытии позиции: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
+      return null;
+    }
+    
+    logger.info(`Позиция успешно открыта: ${type} ${symbol} по цене ${price}`);
+    
+    // Получаем ID позиции
+    const positionId = orderResponse.data.orderId;
+    
+    // Создаем новую запись о позиции
+    const newPosition = {
+      id: positionId,
+      symbol: symbol,
+      type: type,
+      entryPrice: price,
+      size: contractSize,
+      entryTime: new Date().getTime(),
+      confidenceLevel: confidenceLevel || 0
+    };
+    
+    // Устанавливаем стоп-лосс и тейк-профит
+    if (this.config.stopLossPercentage > 0) {
+      const stopPrice = type === 'LONG' 
+        ? price * (1 - this.config.stopLossPercentage / 100) 
+        : price * (1 + this.config.stopLossPercentage / 100);
+      
+      await this.client.setTpsl(
+        symbol, 
+        type.toLowerCase(), 
+        'loss_plan', 
+        stopPrice.toFixed(5), 
+        contractSize.toFixed(5)
+      );
+      
+      logger.info(`Установлен стоп-лосс для ${symbol} на уровне ${stopPrice.toFixed(5)}`);
+    }
+    
+    if (this.config.takeProfitPercentage > 0) {
+      const takeProfitPrice = type === 'LONG' 
+        ? price * (1 + this.config.takeProfitPercentage / 100) 
+        : price * (1 - this.config.takeProfitPercentage / 100);
+      
+      await this.client.setTpsl(
+        symbol, 
+        type.toLowerCase(), 
+        'profit_plan', 
+        takeProfitPrice.toFixed(5), 
+        contractSize.toFixed(5)
+      );
+      
+      logger.info(`Установлен тейк-профит для ${symbol} на уровне ${takeProfitPrice.toFixed(5)}`);
+    }
+    
+    // Добавляем позицию в список открытых
+    this.openPositions.push(newPosition);
+    
+    // Добавляем позицию в историю
+    this.positionHistory.push({
+      ...newPosition,
+      status: 'open',
+      reason: reason || 'Сигнал стратегии'
+    });
+    
+    this.emit('position_opened', newPosition);
+    return newPosition;
+  } catch (error) {
+    logger.error('Ошибка при открытии позиции: ' + error.message);
+    return null;
   }
+}
 
   async closePosition(positionId, percentage) {
     try {

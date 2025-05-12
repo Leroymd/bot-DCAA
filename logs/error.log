@@ -159,3 +159,162 @@
 2025-05-12 15:55:17 [ERROR] Торговый бот не инициализирован или нет клиента API
 2025-05-12 15:56:17 [ERROR] Торговый бот не инициализирован или нет клиента API
 2025-05-12 15:57:17 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:20:36 [ERROR] Uncaught Exception: listen EADDRINUSE: address already in use :::5000
+2025-05-12 16:21:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:21:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:21:19 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:21:19 [ERROR] Response status:
+2025-05-12 16:21:19 [ERROR] Response data:
+2025-05-12 16:21:19 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:21:19 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:21:34 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:21:34 [ERROR] Response status:
+2025-05-12 16:21:34 [ERROR] Response data:
+2025-05-12 16:21:34 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:21:34 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:21:49 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:21:49 [ERROR] Response status:
+2025-05-12 16:21:49 [ERROR] Response data:
+2025-05-12 16:21:49 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:21:49 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:04 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:04 [ERROR] Response status:
+2025-05-12 16:22:04 [ERROR] Response data:
+2025-05-12 16:22:04 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:04 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:19 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:19 [ERROR] Response status:
+2025-05-12 16:22:19 [ERROR] Response data:
+2025-05-12 16:22:19 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:19 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:34 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:34 [ERROR] Response status:
+2025-05-12 16:22:34 [ERROR] Response data:
+2025-05-12 16:22:34 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:34 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:50 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:50 [ERROR] Response status:
+2025-05-12 16:22:50 [ERROR] Response data:
+2025-05-12 16:22:50 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:50 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:07 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:07 [ERROR] Response status:
+2025-05-12 16:23:07 [ERROR] Response data:
+2025-05-12 16:23:07 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:07 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:19 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:19 [ERROR] Response status:
+2025-05-12 16:23:19 [ERROR] Response data:
+2025-05-12 16:23:19 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:19 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:34 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:34 [ERROR] Response status:
+2025-05-12 16:23:34 [ERROR] Response data:
+2025-05-12 16:23:34 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:34 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:49 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:49 [ERROR] Response status:
+2025-05-12 16:23:49 [ERROR] Response data:
+2025-05-12 16:23:49 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:49 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:24:04 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:24:04 [ERROR] Response status:
+2025-05-12 16:24:04 [ERROR] Response data:
+2025-05-12 16:24:04 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:24:04 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:25:05 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:25:05 [ERROR] Response status:
+2025-05-12 16:25:05 [ERROR] Response data:
+2025-05-12 16:25:05 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:25:05 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:26:06 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:26:06 [ERROR] Response status:
+2025-05-12 16:26:06 [ERROR] Response data:
+2025-05-12 16:26:06 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:26:06 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:27:07 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:27:07 [ERROR] Response status:
+2025-05-12 16:27:07 [ERROR] Response data:
+2025-05-12 16:27:07 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:27:07 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:28:09 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:28:09 [ERROR] Response status:
+2025-05-12 16:28:09 [ERROR] Response data:
+2025-05-12 16:28:09 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:28:09 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:29:09 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:29:09 [ERROR] Response status:
+2025-05-12 16:29:09 [ERROR] Response data:
+2025-05-12 16:29:09 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:29:09 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:30:10 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:30:10 [ERROR] Response status:
+2025-05-12 16:30:10 [ERROR] Response data:
+2025-05-12 16:30:10 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:30:10 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:31:11 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:31:11 [ERROR] Response status:
+2025-05-12 16:31:11 [ERROR] Response data:
+2025-05-12 16:31:11 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:31:11 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:32:12 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:32:12 [ERROR] Response status:
+2025-05-12 16:32:12 [ERROR] Response data:
+2025-05-12 16:32:12 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:32:12 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:33:13 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:33:13 [ERROR] Response status:
+2025-05-12 16:33:13 [ERROR] Response data:
+2025-05-12 16:33:13 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:33:13 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:34:14 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:34:14 [ERROR] Response status:
+2025-05-12 16:34:14 [ERROR] Response data:
+2025-05-12 16:34:14 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:34:14 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:35:15 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:35:15 [ERROR] Response status:
+2025-05-12 16:35:15 [ERROR] Response data:
+2025-05-12 16:35:15 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:35:15 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:36:16 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:36:16 [ERROR] Response status:
+2025-05-12 16:36:16 [ERROR] Response data:
+2025-05-12 16:36:16 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:36:16 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:37:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:37:17 [ERROR] Response status:
+2025-05-12 16:37:17 [ERROR] Response data:
+2025-05-12 16:37:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:37:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:38:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:38:17 [ERROR] Response status:
+2025-05-12 16:38:17 [ERROR] Response data:
+2025-05-12 16:38:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:38:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:39:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:39:17 [ERROR] Response status:
+2025-05-12 16:39:17 [ERROR] Response data:
+2025-05-12 16:39:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:39:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:40:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:40:17 [ERROR] Response status:
+2025-05-12 16:40:17 [ERROR] Response data:
+2025-05-12 16:40:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:40:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:41:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:41:17 [ERROR] Response status:
+2025-05-12 16:41:17 [ERROR] Response data:
+2025-05-12 16:41:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:41:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:42:10 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:34 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:36 [ERROR] Не удалось отсканировать пары: отсутствует клиент API
+2025-05-12 16:42:47 [ERROR] Не удалось отсканировать пары: отсутствует клиент API
+2025-05-12 16:42:48 [ERROR] Не удалось отсканировать пары: отсутствует клиент API
+2025-05-12 16:42:49 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:34 [ERROR] Торговый бот не инициализирован или нет клиента API

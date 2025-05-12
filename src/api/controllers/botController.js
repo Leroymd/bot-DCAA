@@ -6,6 +6,8 @@ let tradingBot = null;
 exports.setBotInstance = function(botInstance) {
   tradingBot = botInstance;
 };
+// Исправление в src/api/controllers/botController.js
+
 exports.getStatus = function(req, res) {
   try {
     if (!tradingBot) {
@@ -18,40 +20,7 @@ exports.getStatus = function(req, res) {
     // Принудительно обновляем статус перед отправкой
     const status = tradingBot.getStatus();
     
-    // Принудительно получаем реальные данные о балансе
-    tradingBot.updateAccountBalance().then(() => {
-      // Обновляем статус снова после обновления баланса
-      const updatedStatus = tradingBot.getStatus();
-      return res.json({
-        success: true,
-        data: updatedStatus
-      });
-    }).catch(error => {
-      logger.warn('Не удалось обновить баланс: ' + error.message);
-      return res.json({
-        success: true,
-        data: status
-      });
-    });
-  } catch (error) {
-    logger.error('Error getting bot status: ' + error.message);
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-exports.getStatus = function(req, res) {
-  try {
-    if (!tradingBot) {
-      return res.status(500).json({
-        success: false,
-        message: 'Trading bot instance not initialized'
-      });
-    }
-    
-    const status = tradingBot.getStatus();
-    
+    // Отправляем текущий статус без попытки обновления баланса
     return res.json({
       success: true,
       data: status
@@ -64,7 +33,6 @@ exports.getStatus = function(req, res) {
     });
   }
 };
-
 exports.startBot = function(req, res) {
   if (!tradingBot) {
     return res.status(500).json({

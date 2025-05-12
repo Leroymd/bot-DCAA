@@ -28,141 +28,142 @@ class BitGetClient {
   }
 
   generateSignature(timestamp, method, requestPath, body = '') {
-  try {
-    const message = timestamp + method.toUpperCase() + requestPath + (body || '');
-    
-    if (this.debug) {
-      // Выводим данные для подписи (но скрываем секретный ключ)
-      logger.info(`Generating signature for: [${timestamp}][${method.toUpperCase()}][${requestPath}]${body ? '[BODY]' : ''}`);
+    try {
+      const message = timestamp + method.toUpperCase() + requestPath + (body || '');
+      
+      if (this.debug) {
+        // Выводим данные для подписи (но скрываем секретный ключ)
+        logger.info(`Generating signature for: [${timestamp}][${method.toUpperCase()}][${requestPath}]${body ? '[BODY]' : ''}`);
+      }
+      
+      const signature = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(message)
+        .digest('base64');
+      
+      if (this.debug) {
+        logger.info(`Generated signature: ${signature.substring(0, 10)}...`);
+      }
+      
+      return signature;
+    } catch (error) {
+      logger.error(`Error generating signature: ${error.message}`);
+      throw error;
     }
-    
-    const signature = crypto
-      .createHmac('sha256', this.apiSecret)
-      .update(message)
-      .digest('base64');
-    
-    if (this.debug) {
-      logger.info(`Generated signature: ${signature.substring(0, 10)}...`);
-    }
-    
-    return signature;
-  } catch (error) {
-    logger.error(`Error generating signature: ${error.message}`);
-    throw error;
   }
-}
 
   async request(method, endpoint, params = {}, data = null, retryCount = 0) {
-  try {
-    const timestamp = Date.now().toString();
-    let requestPath = endpoint;
-    let url = `${this.baseUrl}${endpoint}`;
-    let queryString = '';
-    
-    if (params && Object.keys(params).length > 0 && method.toUpperCase() === 'GET') {
-      queryString = '?' + querystring.stringify(params);
-      requestPath += queryString;
-      url += queryString;
-    }
-    
-    const jsonData = data ? JSON.stringify(data) : '';
-    
-    // Для эндпоинтов, требующих аутентификацию
-    const requiresAuth = !endpoint.startsWith('/api/v2/public/');
-    
-    let headers = {
-      'Content-Type': 'application/json'
-    };
-    
-    if (requiresAuth) {
-      // Добавляем аутентификационные заголовки только для приватных эндпоинтов
-      const signature = this.generateSignature(timestamp, method, requestPath, jsonData);
+    try {
+      const timestamp = Date.now().toString();
+      let requestPath = endpoint;
+      let url = `${this.baseUrl}${endpoint}`;
+      let queryString = '';
       
-      headers = {
-        ...headers,
-        'ACCESS-KEY': this.apiKey,
-        'ACCESS-SIGN': signature,
-        'ACCESS-TIMESTAMP': timestamp,
-        'ACCESS-PASSPHRASE': this.passphrase
+      // Корректно обрабатываем параметры для GET-запросов
+      if (params && Object.keys(params).length > 0 && method.toUpperCase() === 'GET') {
+        queryString = '?' + querystring.stringify(params);
+        requestPath += queryString;
+        url += queryString;
+      }
+      
+      const jsonData = data ? JSON.stringify(data) : '';
+      
+      // Для эндпоинтов, требующих аутентификацию
+      const requiresAuth = !endpoint.startsWith('/api/v2/public/');
+      
+      let headers = {
+        'Content-Type': 'application/json'
       };
       
-      if (this.demo) {
-        headers['X-SIMULATED-TRADING'] = '1';
-      }
-    }
-    
-    if (this.debug) {
-      logger.info(`API Request: ${method.toUpperCase()} ${url}`);
-      if (params && Object.keys(params).length > 0) {
-        logger.info('Request params:', JSON.stringify(params));
-      }
-      if (jsonData) {
-        logger.info('Request body:', jsonData);
-      }
-      
-      // Логируем заголовки запроса (скрываем секретные данные)
-      const logHeaders = { ...headers };
-      if (logHeaders['ACCESS-KEY']) logHeaders['ACCESS-KEY'] = `${logHeaders['ACCESS-KEY'].substring(0, 5)}...`;
-      if (logHeaders['ACCESS-SIGN']) logHeaders['ACCESS-SIGN'] = `${logHeaders['ACCESS-SIGN'].substring(0, 5)}...`;
-      if (logHeaders['ACCESS-PASSPHRASE']) logHeaders['ACCESS-PASSPHRASE'] = '******';
-      
-      logger.info('Request headers:', JSON.stringify(logHeaders));
-    }
-    
-    const response = await axios({
-      method: method.toUpperCase(),
-      url,
-      headers,
-      data: jsonData || undefined,
-      timeout: this.timeout
-    });
-    
-    if (this.debug) {
-      logger.info(`API Response (${method.toUpperCase()} ${endpoint}): ${response.status} ${response.statusText}`);
-      logger.info(`Response data: ${JSON.stringify(response.data)}`);
-    }
-    
-    return response.data;
-  } catch (error) {
-    logger.error(`API Error (${method.toUpperCase()} ${endpoint}): ${error.message}`);
-    
-    if (error.response) {
-      logger.error('Response status:', error.response.status);
-      logger.error('Response data:', JSON.stringify(error.response.data));
-      
-      // Анализируем ошибки от API
-      if (error.response.data && error.response.data.code) {
-        switch(error.response.data.code) {
-          case '40037':
-            logger.error('API ключ не существует. Проверьте правильность API ключа и убедитесь, что он активен на бирже BitGet');
-            break;
-          case '40002':
-            logger.error('Ошибка подписи. Проверьте формат и правильность секретного ключа');
-            break;
-          case '40003':
-            logger.error('Ошибка passphrase. Проверьте правильность passphrase');
-            break;
-          default:
-            logger.error(`Код ошибки API: ${error.response.data.code}, сообщение: ${error.response.data.msg}`);
+      if (requiresAuth) {
+        // Добавляем аутентификационные заголовки только для приватных эндпоинтов
+        const signature = this.generateSignature(timestamp, method, requestPath, jsonData);
+        
+        headers = {
+          ...headers,
+          'ACCESS-KEY': this.apiKey,
+          'ACCESS-SIGN': signature,
+          'ACCESS-TIMESTAMP': timestamp,
+          'ACCESS-PASSPHRASE': this.passphrase
+        };
+        
+        if (this.demo) {
+          headers['X-SIMULATED-TRADING'] = '1';
         }
       }
-    }
-    
-    if (retryCount < this.maxRetries && 
+      
+      if (this.debug) {
+        logger.info(`API Request: ${method.toUpperCase()} ${url}`);
+        if (params && Object.keys(params).length > 0) {
+          logger.info('Request params:', JSON.stringify(params));
+        }
+        if (jsonData) {
+          logger.info('Request body:', jsonData);
+        }
+        
+        // Логируем заголовки запроса (скрываем секретные данные)
+        const logHeaders = { ...headers };
+        if (logHeaders['ACCESS-KEY']) logHeaders['ACCESS-KEY'] = `${logHeaders['ACCESS-KEY'].substring(0, 5)}...`;
+        if (logHeaders['ACCESS-SIGN']) logHeaders['ACCESS-SIGN'] = `${logHeaders['ACCESS-SIGN'].substring(0, 5)}...`;
+        if (logHeaders['ACCESS-PASSPHRASE']) logHeaders['ACCESS-PASSPHRASE'] = '******';
+        
+        logger.info('Request headers:', JSON.stringify(logHeaders));
+      }
+      
+      const response = await axios({
+        method: method.toUpperCase(),
+        url,
+        headers,
+        data: jsonData || undefined,
+        timeout: this.timeout
+      });
+      
+      if (this.debug) {
+        logger.info(`API Response (${method.toUpperCase()} ${endpoint}): ${response.status} ${response.statusText}`);
+        logger.info(`Response data: ${JSON.stringify(response.data)}`);
+      }
+      
+      return response.data;
+    } catch (error) {
+      logger.error(`API Error (${method.toUpperCase()} ${endpoint}): ${error.message}`);
+      
+      if (error.response) {
+        logger.error('Response status:', error.response.status);
+        logger.error('Response data:', JSON.stringify(error.response.data));
+        
+        // Анализируем ошибки от API
+        if (error.response.data && error.response.data.code) {
+          switch(error.response.data.code) {
+            case '40037':
+              logger.error('API ключ не существует. Проверьте правильность API ключа и убедитесь, что он активен на бирже BitGet');
+              break;
+            case '40002':
+              logger.error('Ошибка подписи. Проверьте формат и правильность секретного ключа');
+              break;
+            case '40003':
+              logger.error('Ошибка passphrase. Проверьте правильность passphrase');
+              break;
+            default:
+              logger.error(`Код ошибки API: ${error.response.data.code}, сообщение: ${error.response.data.msg}`);
+          }
+        }
+      }
+      
+      if (retryCount < this.maxRetries && 
         (error.code === 'ECONNABORTED' || 
          error.code === 'ETIMEDOUT' || 
          (error.response && error.response.status >= 500))) {
       
-      logger.info(`Retrying request (${retryCount + 1}/${this.maxRetries}) after ${this.retryDelay}ms...`);
+        logger.info(`Retrying request (${retryCount + 1}/${this.maxRetries}) after ${this.retryDelay}ms...`);
+        
+        await new Promise(r => setTimeout(r, this.retryDelay));
+        
+        return this.request(method, endpoint, params, data, retryCount + 1);
+      }
       
-      await new Promise(r => setTimeout(r, this.retryDelay));
-      
-      return this.request(method, endpoint, params, data, retryCount + 1);
+      throw error;
     }
-    
-    throw error;
   }
-}
 
   async getServerTime() {
     try {
@@ -173,49 +174,47 @@ class BitGetClient {
     }
   }
 
- async getAccountAssets(marginCoin = 'USDT') {
-  try {
-    logger.info(`Запрос балансов для ${marginCoin}...`);
-    
-    const endpoint = '/api/v2/mix/account/accounts';
-    const params = { productType: "USDT-FUTURES", marginCoin };
-    
-    const response = await this.request('GET', endpoint, params);
-    
-    if (!response) {
-      logger.warn('Пустой ответ при запросе баланса');
-      return { code: 'ERROR', msg: 'Empty response', data: null };
-    }
-    
-    if (response.code && response.code !== '00000') {
-      logger.warn(`Ошибка API при запросе баланса: ${response.code} - ${response.msg}`);
-      return response;
-    }
-    
-    if (this.debug) {
-      // Выводим полученный баланс в логи для отладки
-      if (response.data && response.data.length > 0) {
-        logger.info(`Получен баланс: ${marginCoin} = ${response.data[0].available}`);
-        logger.info(`Дополнительная информация о балансе: ${JSON.stringify(response.data[0])}`);
-      } else {
-        logger.warn(`Ответ API содержит пустые данные о балансе: ${JSON.stringify(response)}`);
+  async getAccountAssets(marginCoin = 'USDT') {
+    try {
+      logger.info(`Запрос балансов для ${marginCoin}...`);
+      
+      const endpoint = '/api/v2/mix/account/accounts';
+      const params = { productType: "USDT-FUTURES", marginCoin };
+      
+      const response = await this.request('GET', endpoint, params);
+      
+      if (!response) {
+        logger.warn('Пустой ответ при запросе баланса');
+        return { code: 'ERROR', msg: 'Empty response', data: null };
       }
+      
+      if (response.code && response.code !== '00000') {
+        logger.warn(`Ошибка API при запросе баланса: ${response.code} - ${response.msg}`);
+        return response;
+      }
+      
+      if (this.debug) {
+        // Выводим полученный баланс в логи для отладки
+        if (response.data && response.data.length > 0) {
+          logger.info(`Получен баланс: ${marginCoin} = ${response.data[0].available}`);
+          logger.info(`Дополнительная информация о балансе: ${JSON.stringify(response.data[0])}`);
+        } else {
+          logger.warn(`Ответ API содержит пустые данные о балансе: ${JSON.stringify(response)}`);
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      logger.error(`Ошибка при запросе баланса: ${error.message}`);
+      if (error.response) {
+        logger.error(`Ответ сервера: ${JSON.stringify(error.response.data)}`);
+      }
+      throw error;
     }
-    
-    return response;
-  } catch (error) {
-    logger.error(`Ошибка при запросе баланса: ${error.message}`);
-    if (error.response) {
-      logger.error(`Ответ сервера: ${JSON.stringify(error.response.data)}`);
-    }
-    throw error;
   }
-}
 
-
-
-
-
+  // Удаляем метод getAccountInfo и используем getAccountAssets вместо него
+  
   async getPositions(symbol, marginCoin = 'USDT') {
     const params = { productType: "USDT-FUTURES" };
     if (symbol) params.symbol = symbol;
@@ -444,14 +443,6 @@ class BitGetClient {
       endTime,
       pageSize,
       productType: "USDT-FUTURES"
-    });
-  }
-  
-  // Добавляем метод для получения информации о торговом счете
-  async getAccountInfo() {
-    return this.request('GET', '/api/v2/mix/account/account', {
-      productType: "USDT-FUTURES",
-      marginCoin: "USDT"
     });
   }
   

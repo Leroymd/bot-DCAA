@@ -56,46 +56,48 @@ class TradingBot extends EventEmitter {
     };
   }
 
-isRunning() {
-  return this.status.status === 'running' && this.status.isActive === true;
-}
-  async clearDemoData() {
-  try {
-    logger.info('Очистка демо-данных...');
-    
-    // Сбрасываем историю позиций
-    this.positionManager.positionHistory = [];
-    
-    // Сбрасываем историю сигналов
-    this.strategy.signals = [];
-    
-    // Сбрасываем кэшированные данные
-    dataStore.set('recentSignals', []);
-    dataStore.set('tradeHistory', []);
-    
-    // Инициализируем историю баланса с текущим балансом
-    const balanceHistory = [{
-      date: new Date().toISOString().split('T')[0],
-      balance: this.balance,
-      profit: 0,
-      profitPercentage: 0
-    }];
-    dataStore.set('balanceHistory', balanceHistory);
-    
-    // Сбрасываем показатели производительности
-    this.status.totalProfit = 0;
-    this.status.profitPercentage = 0;
-    this.status.todayProfit = 0;
-    this.status.todayProfitPercentage = 0;
-    this.status.winRate = 0;
-    this.status.totalTrades = 0;
-    this.status.avgProfit = 0;
-    
-    logger.info('Демо-данные очищены');
-  } catch (error) {
-    logger.error('Ошибка при очистке демо-данных: ' + error.message);
+  isRunning() {
+    return this.status.status === 'running' && this.status.isActive === true;
   }
-}
+  
+  async clearDemoData() {
+    try {
+      logger.info('Очистка демо-данных...');
+      
+      // Сбрасываем историю позиций
+      this.positionManager.positionHistory = [];
+      
+      // Сбрасываем историю сигналов
+      this.strategy.signals = [];
+      
+      // Сбрасываем кэшированные данные
+      dataStore.set('recentSignals', []);
+      dataStore.set('tradeHistory', []);
+      
+      // Инициализируем историю баланса с текущим балансом
+      const balanceHistory = [{
+        date: new Date().toISOString().split('T')[0],
+        balance: this.balance,
+        profit: 0,
+        profitPercentage: 0
+      }];
+      dataStore.set('balanceHistory', balanceHistory);
+      
+      // Сбрасываем показатели производительности
+      this.status.totalProfit = 0;
+      this.status.profitPercentage = 0;
+      this.status.todayProfit = 0;
+      this.status.todayProfitPercentage = 0;
+      this.status.winRate = 0;
+      this.status.totalTrades = 0;
+      this.status.avgProfit = 0;
+      
+      logger.info('Демо-данные очищены');
+    } catch (error) {
+      logger.error('Ошибка при очистке демо-данных: ' + error.message);
+    }
+  }
+  
   async start() {
     try {
       logger.info('Инициализация торгового бота BitGet...');
@@ -161,7 +163,7 @@ isRunning() {
       
       this.startIntervals();
          await this.clearDemoData();
-		 
+       
       logger.info('Инициализация завершена. Бот готов к торговле.');
       
       this.status.status = 'running';
@@ -201,101 +203,158 @@ isRunning() {
     }
   }
   
-  // 7. Обновим функцию сканирования пар в TradingBot.js
-
-async scanMarketPairs() {
-  try {
-    logger.info('Сканирование торговых пар...');
+  // Функция расчета рейтинга пары для сканирования
+  calculatePairScore(volume24h, totalFractals, priceChangePercent, trendStrength, isBullishTrend) {
+    // Базовый score
+    let score = 50;
     
-    if (!this.client) {
-      logger.error('Не удалось отсканировать пары: отсутствует клиент API');
+    // Увеличиваем score при высоком объеме (0-20 баллов)
+    if (volume24h > 1000000000) { // Больше 1 млрд
+      score += 20;
+    } else if (volume24h > 500000000) { // Больше 500 млн
+      score += 15;
+    } else if (volume24h > 100000000) { // Больше 100 млн
+      score += 10;
+    } else if (volume24h > 50000000) { // Больше 50 млн
+      score += 5;
+    }
+    
+    // Увеличиваем score при большом количестве фракталов (0-15 баллов)
+    score += Math.min(totalFractals * 3, 15);
+    
+    // Увеличиваем score при сильном тренде (0-15 баллов)
+    score += Math.min(trendStrength * 3, 15);
+    
+    // Увеличиваем score при значительном изменении цены (0-10 баллов)
+    const absPriceChange = Math.abs(priceChangePercent);
+    if (absPriceChange > 5) {
+      score += 10;
+    } else if (absPriceChange > 3) {
+      score += 7;
+    } else if (absPriceChange > 1) {
+      score += 5;
+    } else if (absPriceChange > 0.5) {
+      score += 3;
+    }
+    
+    // Добавляем бонус для восходящего тренда (если выключен, переход на медвежий режим)
+    if (isBullishTrend) {
+      score += 5;
+    }
+    
+    // Добавляем случайный фактор для разнообразия (0-5 баллов)
+    score += Math.random() * 5;
+    
+    // Ограничиваем max score до 100
+    return Math.min(Math.max(score, 1), 100);
+  }
+  
+  // Функция для форматирования объема
+  formatVolume(volume) {
+    if (volume >= 1000000000) {
+      return (volume / 1000000000).toFixed(2) + 'B';
+    } else if (volume >= 1000000) {
+      return (volume / 1000000).toFixed(2) + 'M';
+    } else if (volume >= 1000) {
+      return (volume / 1000).toFixed(2) + 'K';
+    } else {
+      return volume.toFixed(2);
+    }
+  }
+
+  async scanMarketPairs() {
+    try {
+      logger.info('Сканирование торговых пар...');
+      
+      if (!this.client) {
+        logger.error('Не удалось отсканировать пары: отсутствует клиент API');
+        return [];
+      }
+      
+      const exchangeInfo = await this.client.getExchangeInfo();
+      if (!exchangeInfo || !exchangeInfo.data) {
+        throw new Error('Не удалось получить информацию о доступных парах');
+      }
+      
+      const allPairs = exchangeInfo.data.filter(pair => pair.quoteCoin === 'USDT');
+      
+      const rankedPairs = [];
+      
+      // Ограничиваем количество пар для сканирования
+      const pairsToScan = allPairs.slice(0, 30); // Сканируем только топ-30 пар
+      
+      for (const pair of pairsToScan) {
+        try {
+          const ticker = await this.client.getTicker(pair.symbol);
+          if (!ticker || !ticker.data) continue;
+          
+          const candles = await this.client.getCandles(pair.symbol, '15m', 100);
+          if (!candles || !candles.data || candles.data.length < 50) continue;
+          
+          // Преобразуем свечи в нужный формат
+          const formattedCandles = candles.data.map(candle => ({
+            time: parseInt(candle[0]),
+            open: parseFloat(candle[1]),
+            high: parseFloat(candle[2]),
+            low: parseFloat(candle[3]),
+            close: parseFloat(candle[4]),
+            volume: parseFloat(candle[5])
+          }));
+          
+          // Рассчитываем индикаторы
+          const heikinAshiCandles = this.indicatorManager.calculateHeikinAshi(formattedCandles);
+          const fractals = this.indicatorManager.calculateFractals(heikinAshiCandles);
+          const fastEMA = this.indicatorManager.calculateEMA(heikinAshiCandles, 89);
+          const mediumEMA = this.indicatorManager.calculateEMA(heikinAshiCandles, 200);
+          const pacChannel = this.indicatorManager.calculatePAC(heikinAshiCandles, 34);
+          
+          const totalFractals = fractals.buyFractals.length + fractals.sellFractals.length;
+          
+          // Получаем данные о объеме
+          const volume24h = parseFloat(ticker.data.volCcy24h || ticker.data.vol24h || 0);
+          
+          // Получаем изменение цены
+          const priceChangePercent = parseFloat(ticker.data.chgUTC || ticker.data.priceChangePercent || 0);
+          
+          // Проверяем тренд
+          const lastIndex = fastEMA.length - 1;
+          const fastEmaOverMedium = fastEMA[lastIndex] > mediumEMA[lastIndex];
+          const trendStrength = Math.abs(fastEMA[lastIndex] - mediumEMA[lastIndex]) / mediumEMA[lastIndex] * 100;
+          
+          // Рассчитываем силу сигнала
+          const score = this.calculatePairScore(
+            volume24h,
+            totalFractals,
+            priceChangePercent,
+            trendStrength,
+            fastEmaOverMedium
+          );
+          
+          rankedPairs.push({
+            pair: pair.symbol,
+            strength: Math.round(score),
+            signals: totalFractals,
+            volume: this.formatVolume(volume24h)
+          });
+        } catch (err) {
+          logger.warn(`Ошибка при анализе пары ${pair.symbol}: ${err.message}`);
+        }
+      }
+      
+      rankedPairs.sort((a, b) => b.strength - a.strength);
+      
+      const topPairs = rankedPairs.slice(0, 20);
+      dataStore.set('topPairs', topPairs);
+      
+      this.status.lastScan = new Date().toLocaleTimeString();
+      
+      logger.info(`Сканирование завершено, найдено ${topPairs.length} перспективных пар`);
+      return topPairs;
+    } catch (error) {
+      logger.error(`Ошибка при сканировании пар: ${error.message}`);
       return [];
     }
-    
-    const exchangeInfo = await this.client.getExchangeInfo();
-    if (!exchangeInfo || !exchangeInfo.data) {
-      throw new Error('Не удалось получить информацию о доступных парах');
-    }
-    
-    const allPairs = exchangeInfo.data.filter(pair => pair.quoteCoin === 'USDT');
-    
-    const rankedPairs = [];
-    
-    // Ограничиваем количество пар для сканирования
-    const pairsToScan = allPairs.slice(0, 30); // Сканируем только топ-30 пар
-    
-    for (const pair of pairsToScan) {
-      try {
-        const ticker = await this.client.getTicker(pair.symbol);
-        if (!ticker || !ticker.data) continue;
-        
-        const candles = await this.client.getCandles(pair.symbol, '15m', 100);
-        if (!candles || !candles.data || candles.data.length < 50) continue;
-        
-        // Преобразуем свечи в нужный формат
-        const formattedCandles = candles.data.map(candle => ({
-          time: parseInt(candle[0]),
-          open: parseFloat(candle[1]),
-          high: parseFloat(candle[2]),
-          low: parseFloat(candle[3]),
-          close: parseFloat(candle[4]),
-          volume: parseFloat(candle[5])
-        }));
-        
-        // Рассчитываем индикаторы
-        const heikinAshiCandles = this.indicatorManager.calculateHeikinAshi(formattedCandles);
-        const fractals = this.indicatorManager.calculateFractals(heikinAshiCandles);
-        const fastEMA = this.indicatorManager.calculateEMA(heikinAshiCandles, 89);
-        const mediumEMA = this.indicatorManager.calculateEMA(heikinAshiCandles, 200);
-        const pacChannel = this.indicatorManager.calculatePAC(heikinAshiCandles, 34);
-        
-        const totalFractals = fractals.buyFractals.length + fractals.sellFractals.length;
-        
-        // Получаем данные о объеме
-        const volume24h = parseFloat(ticker.data.volCcy24h || ticker.data.vol24h || 0);
-        
-        // Получаем изменение цены
-        const priceChangePercent = parseFloat(ticker.data.chgUTC || ticker.data.priceChangePercent || 0);
-        
-        // Проверяем тренд
-        const lastIndex = fastEMA.length - 1;
-        const fastEmaOverMedium = fastEMA[lastIndex] > mediumEMA[lastIndex];
-        const trendStrength = Math.abs(fastEMA[lastIndex] - mediumEMA[lastIndex]) / mediumEMA[lastIndex] * 100;
-        
-        // Рассчитываем силу сигнала
-        const score = this.calculatePairScore(
-          volume24h,
-          totalFractals,
-          priceChangePercent,
-          trendStrength,
-          fastEmaOverMedium
-        );
-        
-        rankedPairs.push({
-          pair: pair.symbol,
-          strength: Math.round(score),
-          signals: totalFractals,
-          volume: this.formatVolume(volume24h)
-        });
-      } catch (err) {
-        logger.warn(`Ошибка при анализе пары ${pair.symbol}: ${err.message}`);
-      }
-    }
-    
-    rankedPairs.sort((a, b) => b.strength - a.strength);
-    
-    const topPairs = rankedPairs.slice(0, 20);
-    dataStore.set('topPairs', topPairs);
-    
-    this.status.lastScan = new Date().toLocaleTimeString();
-    
-    logger.info(`Сканирование завершено, найдено ${topPairs.length} перспективных пар`);
-    return topPairs;
-  } catch (error) {
-    logger.error(`Ошибка при сканировании пар: ${error.message}`);
-    return [];
   }
-}
   
   async selectPairForTrading(pair) {
     try {
@@ -449,132 +508,132 @@ async scanMarketPairs() {
   }
 
   async updateAccountBalance() {
-  try {
-    if (!this.client) {
-      logger.warn('Не удалось обновить баланс: отсутствует клиент API');
+    try {
+      if (!this.client) {
+        logger.warn('Не удалось обновить баланс: отсутствует клиент API');
+        return false;
+      }
+      
+      // Используем getAccountAssets вместо getAccountInfo!
+      const accountInfo = await this.client.getAccountAssets('USDT');
+      
+      if (!accountInfo || !accountInfo.data || !accountInfo.data.length) {
+        logger.warn('Не удалось получить информацию о счете');
+        return false;
+      }
+      
+      // Обновляем баланс
+      this.balance = parseFloat(accountInfo.data[0].available);
+      this.positionManager.setBalance(this.balance);
+      
+      // Если это первое обновление, устанавливаем начальный баланс
+      if (this.initialBalance === 0) {
+        this.initialBalance = this.balance;
+      }
+      
+      logger.info(`Баланс обновлен: ${this.balance.toFixed(2)} USDT`);
+      
+      // Обновляем историю баланса
+      const balanceHistory = this.getBalanceHistory();
+      dataStore.set('balanceHistory', balanceHistory);
+      
+      return true;
+    } catch (error) {
+      logger.error(`Ошибка при обновлении баланса: ${error.message}`);
       return false;
     }
-    
-    const accountInfo = await this.client.getAccountInfo();
-    
-    if (!accountInfo || !accountInfo.data) {
-      logger.warn('Не удалось получить информацию о счете');
-      return false;
-    }
-    
-    // Обновляем баланс
-    this.balance = parseFloat(accountInfo.data.available);
-    this.positionManager.setBalance(this.balance);
-    
-    // Если это первое обновление, устанавливаем начальный баланс
-    if (this.initialBalance === 0) {
-      this.initialBalance = this.balance;
-    }
-    
-    logger.info(`Баланс обновлен: ${this.balance.toFixed(2)} USDT`);
-    
-    // Обновляем историю баланса
-    const balanceHistory = this.getBalanceHistory();
-    dataStore.set('balanceHistory', balanceHistory);
-    
-    return true;
-  } catch (error) {
-    logger.error(`Ошибка при обновлении баланса: ${error.message}`);
-    return false;
   }
-}
 
   updateStatus() {
-  const now = new Date().getTime();
-  
-  if (this.status.status === 'running') {
-    this.status.uptime = now - this.status.startTime;
-  }
-  
-  if (this.dailyPerformance && this.dailyPerformance.startBalance > 0) {
-    this.status.todayProfit = this.balance - this.dailyPerformance.startBalance;
-    this.status.todayProfitPercentage = (this.status.todayProfit / this.dailyPerformance.startBalance) * 100;
-  }
-  
-  if (this.initialBalance > 0) {
-    this.status.totalProfit = this.balance - this.initialBalance;
-    this.status.profitPercentage = (this.status.totalProfit / this.initialBalance) * 100;
-  }
-  
-  this.status.withdrawn = this.reinvestmentInfo.totalWithdrawn;
-  
-  // Используем только реальные данные из позиций
-  const positionHistory = this.positionManager.getPositionHistory();
-  const totalTrades = positionHistory.length;
-  const winTrades = positionHistory.filter(trade => trade.result === 'win').length;
-  
-  this.status.totalTrades = totalTrades;
-  this.status.winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
-  
-  if (totalTrades > 0) {
-    const profits = positionHistory.map(trade => trade.pnl || 0);
-    const avgProfit = profits.reduce((sum, pnl) => sum + pnl, 0) / totalTrades;
-    this.status.avgProfit = avgProfit;
-  } else {
-    this.status.avgProfit = 0;
-  }
-  
-  this.status.balance = this.balance;
-  
-  // Получаем активные позиции прямо с биржи
-  if (this.client) {
-    this.positionManager.updateOpenPositions().then(positions => {
-      // Обновляем торговые пары на основе реальных позиций
-      const tradingPairs = [];
-      
-      // Добавляем активные позиции
-      for (const position of positions) {
-        const timeString = this.formatDuration(now - position.entryTime);
+    const now = new Date().getTime();
+    
+    if (this.status.status === 'running') {
+      this.status.uptime = now - this.status.startTime;
+    }
+    
+    if (this.dailyPerformance && this.dailyPerformance.startBalance > 0) {
+      this.status.todayProfit = this.balance - this.dailyPerformance.startBalance;
+      this.status.todayProfitPercentage = (this.status.todayProfit / this.dailyPerformance.startBalance) * 100;
+    }
+    
+    if (this.initialBalance > 0) {
+      this.status.totalProfit = this.balance - this.initialBalance;
+      this.status.profitPercentage = (this.status.totalProfit / this.initialBalance) * 100;
+    }
+    
+    this.status.withdrawn = this.reinvestmentInfo.totalWithdrawn;
+    
+    // Используем только реальные данные из позиций
+    const positionHistory = this.positionManager.getPositionHistory();
+    const totalTrades = positionHistory.length;
+    const winTrades = positionHistory.filter(trade => trade.result === 'win').length;
+    
+    this.status.totalTrades = totalTrades;
+    this.status.winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
+    
+    if (totalTrades > 0) {
+      const profits = positionHistory.map(trade => trade.pnl || 0);
+      const avgProfit = profits.reduce((sum, pnl) => sum + pnl, 0) / totalTrades;
+      this.status.avgProfit = avgProfit;
+    } else {
+      this.status.avgProfit = 0;
+    }
+    
+    this.status.balance = this.balance;
+    
+    // Получаем активные позиции прямо с биржи
+    if (this.client) {
+      this.positionManager.updateOpenPositions().then(positions => {
+        // Обновляем торговые пары на основе реальных позиций
+        const tradingPairs = [];
         
-        tradingPairs.push({
-          pair: position.symbol,
-          status: 'active',
-          position: position.type,
-          entryPrice: position.entryPrice,
-          currentPrice: position.currentPrice || this.currentPrice[position.symbol] || 0,
-          profit: position.pnlPercentage || 0,
-          time: timeString,
-          id: position.id
-        });
-      }
-      
-      // Добавляем остальные торговые пары без позиций
-      for (const symbol of this.config.tradingPairs) {
-        if (!tradingPairs.find(p => p.pair === symbol)) {
+        // Добавляем активные позиции
+        for (const position of positions) {
+          const timeString = this.formatDuration(now - position.entryTime);
+          
           tradingPairs.push({
-            pair: symbol,
-            status: 'waiting',
-            position: null,
-            profit: 0,
-            time: '00:00',
-            signals: this.indicatorManager.getSignalCount(symbol) || 0
+            pair: position.symbol,
+            status: 'active',
+            position: position.type,
+            entryPrice: position.entryPrice,
+            currentPrice: position.currentPrice || this.currentPrice[position.symbol] || 0,
+            profit: position.pnlPercentage || 0,
+            time: timeString,
+            id: position.id
           });
         }
-      }
-      
-      dataStore.set('tradingPairs', tradingPairs);
-    }).catch(error => {
-      logger.error('Ошибка при обновлении позиций: ' + error.message);
-    });
+        
+        // Добавляем остальные торговые пары без позиций
+        for (const symbol of this.config.tradingPairs) {
+          if (!tradingPairs.find(p => p.pair === symbol)) {
+            tradingPairs.push({
+              pair: symbol,
+              status: 'waiting',
+              position: null,
+              profit: 0,
+              time: '00:00',
+              signals: this.indicatorManager.getSignalCount(symbol) || 0
+            });
+          }
+        }
+        
+        dataStore.set('tradingPairs', tradingPairs);
+      }).catch(error => {
+        logger.error('Ошибка при обновлении позиций: ' + error.message);
+      });
+    }
+    
+    // Получаем реальные сигналы
+    const recentSignals = this.strategy.getRecentSignals();
+    dataStore.set('recentSignals', recentSignals);
+    
+    // Обновляем статус бота
+    dataStore.set('botStatus', this.status);
+    
+    this.emit('update', this.status);
+    
+    return this.status;
   }
-  
-  // Получаем реальные сигналы
-  const recentSignals = this.strategy.getRecentSignals();
-  dataStore.set('recentSignals', recentSignals);
-  
-  // Обновляем статус бота
-  dataStore.set('botStatus', this.status);
-  
-  this.emit('update', this.status);
-  
-  return this.status;
-}
-
 
   async checkProfitWithdrawal() {
     try {

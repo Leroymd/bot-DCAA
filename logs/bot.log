@@ -313,3 +313,275 @@
 2025-05-12 15:55:17 [ERROR] Торговый бот не инициализирован или нет клиента API
 2025-05-12 15:56:17 [ERROR] Торговый бот не инициализирован или нет клиента API
 2025-05-12 15:57:17 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:20:10 [INFO] Data loaded from disk
+2025-05-12 16:20:10 [INFO] Initializing trading bot...
+2025-05-12 16:20:10 [INFO] Загрузка конфигурации из файла
+2025-05-12 16:20:10 [INFO] Тестовое подключение к бирже BitGet...
+2025-05-12 16:20:10 [INFO] BitGet API инициализирован:
+2025-05-12 16:20:10 [INFO] - API Key:
+2025-05-12 16:20:10 [INFO] API Request: GET https://api.bitget.com/api/v2/public/time
+2025-05-12 16:20:10 [INFO] Request headers:
+2025-05-12 16:20:11 [INFO] API Response (GET /api/v2/public/time): 200 OK
+2025-05-12 16:20:11 [INFO] Response data: {"code":"00000","msg":"success","requestTime":1747059611584,"data":{"serverTime":"1747059611585"}}
+2025-05-12 16:20:11 [INFO] Успешное подключение к бирже BitGet
+2025-05-12 16:20:11 [INFO] Запрос балансов для USDT...
+2025-05-12 16:20:11 [INFO] Generating signature for: [1747059611338][GET][/api/v2/mix/account/accounts?productType=USDT-FUTURES&marginCoin=USDT]
+2025-05-12 16:20:11 [INFO] Generated signature: FAjn2wTeBN...
+2025-05-12 16:20:11 [INFO] API Request: GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES&marginCoin=USDT
+2025-05-12 16:20:11 [INFO] Request params:
+2025-05-12 16:20:11 [INFO] Request headers:
+2025-05-12 16:20:11 [INFO] API Response (GET /api/v2/mix/account/accounts): 200 OK
+2025-05-12 16:20:11 [INFO] Response data: {"code":"00000","msg":"success","requestTime":1747059611899,"data":[{"marginCoin":"USDT","locked":"0","available":"21.17120795","crossedMaxAvailable":"21.17120795","isolatedMaxAvailable":"21.17120795","maxTransferOut":"21.17120795","accountEquity":"21.17120795","usdtEquity":"21.171207959909","btcEquity":"0.000203525586","crossedRiskRate":"0","unrealizedPL":"0","coupon":"0","crossedUnrealizedPL":"","isolatedUnrealizedPL":"","grant":"","unionTotalMargin":"21.17120795","unionAvailable":"21.17120795","unionMm":"0","assetList":[],"assetMode":"single","isolatedMargin":"0","crossedMargin":"0"}]}
+2025-05-12 16:20:11 [INFO] Получен баланс: USDT = 21.17120795
+2025-05-12 16:20:11 [INFO] Дополнительная информация о балансе: {"marginCoin":"USDT","locked":"0","available":"21.17120795","crossedMaxAvailable":"21.17120795","isolatedMaxAvailable":"21.17120795","maxTransferOut":"21.17120795","accountEquity":"21.17120795","usdtEquity":"21.171207959909","btcEquity":"0.000203525586","crossedRiskRate":"0","unrealizedPL":"0","coupon":"0","crossedUnrealizedPL":"","isolatedUnrealizedPL":"","grant":"","unionTotalMargin":"21.17120795","unionAvailable":"21.17120795","unionMm":"0","assetList":[],"assetMode":"single","isolatedMargin":"0","crossedMargin":"0"}
+2025-05-12 16:20:11 [INFO] Текущий баланс USDT: 21.17120795
+2025-05-12 16:20:11 [INFO] Configuration saved to disk
+2025-05-12 16:20:11 [INFO] Trading bot initialized successfully
+2025-05-12 16:20:11 [INFO] Server running on port 5000
+2025-05-12 16:20:35 [INFO] Data loaded from disk
+2025-05-12 16:20:35 [INFO] Initializing trading bot...
+2025-05-12 16:20:35 [INFO] Загрузка конфигурации из файла
+2025-05-12 16:20:35 [INFO] Тестовое подключение к бирже BitGet...
+2025-05-12 16:20:35 [INFO] BitGet API инициализирован:
+2025-05-12 16:20:35 [INFO] - API Key:
+2025-05-12 16:20:35 [INFO] API Request: GET https://api.bitget.com/api/v2/public/time
+2025-05-12 16:20:35 [INFO] Request headers:
+2025-05-12 16:20:35 [INFO] API Response (GET /api/v2/public/time): 200 OK
+2025-05-12 16:20:35 [INFO] Response data: {"code":"00000","msg":"success","requestTime":1747059636118,"data":{"serverTime":"1747059636119"}}
+2025-05-12 16:20:35 [INFO] Успешное подключение к бирже BitGet
+2025-05-12 16:20:35 [INFO] Запрос балансов для USDT...
+2025-05-12 16:20:35 [INFO] Generating signature for: [1747059635855][GET][/api/v2/mix/account/accounts?productType=USDT-FUTURES&marginCoin=USDT]
+2025-05-12 16:20:35 [INFO] Generated signature: 6TjpbFekzA...
+2025-05-12 16:20:35 [INFO] API Request: GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES&marginCoin=USDT
+2025-05-12 16:20:35 [INFO] Request params:
+2025-05-12 16:20:35 [INFO] Request headers:
+2025-05-12 16:20:36 [INFO] API Response (GET /api/v2/mix/account/accounts): 200 OK
+2025-05-12 16:20:36 [INFO] Response data: {"code":"00000","msg":"success","requestTime":1747059636427,"data":[{"marginCoin":"USDT","locked":"0","available":"21.17120795","crossedMaxAvailable":"21.17120795","isolatedMaxAvailable":"21.17120795","maxTransferOut":"21.17120795","accountEquity":"21.17120795","usdtEquity":"21.171207959909","btcEquity":"0.0002034455","crossedRiskRate":"0","unrealizedPL":"0","coupon":"0","crossedUnrealizedPL":"","isolatedUnrealizedPL":"","grant":"","unionTotalMargin":"21.17120795","unionAvailable":"21.17120795","unionMm":"0","assetList":[],"assetMode":"single","isolatedMargin":"0","crossedMargin":"0"}]}
+2025-05-12 16:20:36 [INFO] Получен баланс: USDT = 21.17120795
+2025-05-12 16:20:36 [INFO] Дополнительная информация о балансе: {"marginCoin":"USDT","locked":"0","available":"21.17120795","crossedMaxAvailable":"21.17120795","isolatedMaxAvailable":"21.17120795","maxTransferOut":"21.17120795","accountEquity":"21.17120795","usdtEquity":"21.171207959909","btcEquity":"0.0002034455","crossedRiskRate":"0","unrealizedPL":"0","coupon":"0","crossedUnrealizedPL":"","isolatedUnrealizedPL":"","grant":"","unionTotalMargin":"21.17120795","unionAvailable":"21.17120795","unionMm":"0","assetList":[],"assetMode":"single","isolatedMargin":"0","crossedMargin":"0"}
+2025-05-12 16:20:36 [INFO] Текущий баланс USDT: 21.17120795
+2025-05-12 16:20:36 [INFO] Configuration saved to disk
+2025-05-12 16:20:36 [INFO] Trading bot initialized successfully
+2025-05-12 16:20:36 [ERROR] Uncaught Exception: listen EADDRINUSE: address already in use :::5000
+2025-05-12 16:21:03 [WARN] Не удалось обновить баланс: отсутствует клиент API
+2025-05-12 16:21:04 [WARN] Не удалось обновить баланс: отсутствует клиент API
+2025-05-12 16:21:04 [WARN] Не удалось обновить баланс: отсутствует клиент API
+2025-05-12 16:21:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:21:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:21:13 [INFO] Сканирование торговых пар...
+2025-05-12 16:21:13 [INFO] Клиент API инициализирован для сканирования пар
+2025-05-12 16:21:16 [INFO] Сканирование торговых пар...
+2025-05-12 16:21:19 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:21:19 [ERROR] Response status:
+2025-05-12 16:21:19 [ERROR] Response data:
+2025-05-12 16:21:19 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:21:19 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:21:20 [INFO] Сканирование торговых пар...
+2025-05-12 16:21:22 [INFO] Пара BTCUSDT уже выбрана для торговли
+2025-05-12 16:21:34 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:21:34 [ERROR] Response status:
+2025-05-12 16:21:34 [ERROR] Response data:
+2025-05-12 16:21:34 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:21:34 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:21:35 [INFO] Сканирование торговых пар...
+2025-05-12 16:21:49 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:21:49 [ERROR] Response status:
+2025-05-12 16:21:49 [ERROR] Response data:
+2025-05-12 16:21:49 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:21:49 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:21:50 [INFO] Сканирование торговых пар...
+2025-05-12 16:22:04 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:04 [ERROR] Response status:
+2025-05-12 16:22:04 [ERROR] Response data:
+2025-05-12 16:22:04 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:04 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:05 [INFO] Сканирование торговых пар...
+2025-05-12 16:22:19 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:19 [ERROR] Response status:
+2025-05-12 16:22:19 [ERROR] Response data:
+2025-05-12 16:22:19 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:19 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:20 [INFO] Сканирование торговых пар...
+2025-05-12 16:22:34 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:34 [ERROR] Response status:
+2025-05-12 16:22:34 [ERROR] Response data:
+2025-05-12 16:22:34 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:34 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:35 [INFO] Сканирование торговых пар...
+2025-05-12 16:22:50 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:22:50 [ERROR] Response status:
+2025-05-12 16:22:50 [ERROR] Response data:
+2025-05-12 16:22:50 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:22:50 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:22:50 [INFO] Сканирование торговых пар...
+2025-05-12 16:23:07 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:07 [ERROR] Response status:
+2025-05-12 16:23:07 [ERROR] Response data:
+2025-05-12 16:23:07 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:07 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:07 [INFO] Сканирование торговых пар...
+2025-05-12 16:23:19 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:19 [ERROR] Response status:
+2025-05-12 16:23:19 [ERROR] Response data:
+2025-05-12 16:23:19 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:19 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:20 [INFO] Сканирование торговых пар...
+2025-05-12 16:23:34 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:34 [ERROR] Response status:
+2025-05-12 16:23:34 [ERROR] Response data:
+2025-05-12 16:23:34 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:34 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:35 [INFO] Сканирование торговых пар...
+2025-05-12 16:23:49 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:23:49 [ERROR] Response status:
+2025-05-12 16:23:49 [ERROR] Response data:
+2025-05-12 16:23:49 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:23:49 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:23:50 [INFO] Сканирование торговых пар...
+2025-05-12 16:24:04 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:24:04 [ERROR] Response status:
+2025-05-12 16:24:04 [ERROR] Response data:
+2025-05-12 16:24:04 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:24:04 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:24:05 [INFO] Сканирование торговых пар...
+2025-05-12 16:25:05 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:25:05 [ERROR] Response status:
+2025-05-12 16:25:05 [ERROR] Response data:
+2025-05-12 16:25:05 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:25:05 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:25:06 [INFO] Сканирование торговых пар...
+2025-05-12 16:26:06 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:26:06 [ERROR] Response status:
+2025-05-12 16:26:06 [ERROR] Response data:
+2025-05-12 16:26:06 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:26:06 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:26:07 [INFO] Сканирование торговых пар...
+2025-05-12 16:27:07 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:27:07 [ERROR] Response status:
+2025-05-12 16:27:07 [ERROR] Response data:
+2025-05-12 16:27:07 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:27:07 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:27:08 [INFO] Сканирование торговых пар...
+2025-05-12 16:28:09 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:28:09 [ERROR] Response status:
+2025-05-12 16:28:09 [ERROR] Response data:
+2025-05-12 16:28:09 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:28:09 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:28:09 [INFO] Сканирование торговых пар...
+2025-05-12 16:29:09 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:29:09 [ERROR] Response status:
+2025-05-12 16:29:09 [ERROR] Response data:
+2025-05-12 16:29:09 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:29:09 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:29:10 [INFO] Сканирование торговых пар...
+2025-05-12 16:30:10 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:30:10 [ERROR] Response status:
+2025-05-12 16:30:10 [ERROR] Response data:
+2025-05-12 16:30:10 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:30:10 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:30:11 [INFO] Сканирование торговых пар...
+2025-05-12 16:31:11 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:31:11 [ERROR] Response status:
+2025-05-12 16:31:11 [ERROR] Response data:
+2025-05-12 16:31:11 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:31:11 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:31:12 [INFO] Сканирование торговых пар...
+2025-05-12 16:32:12 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:32:12 [ERROR] Response status:
+2025-05-12 16:32:12 [ERROR] Response data:
+2025-05-12 16:32:12 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:32:12 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:32:13 [INFO] Сканирование торговых пар...
+2025-05-12 16:33:13 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:33:13 [ERROR] Response status:
+2025-05-12 16:33:13 [ERROR] Response data:
+2025-05-12 16:33:13 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:33:13 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:33:14 [INFO] Сканирование торговых пар...
+2025-05-12 16:34:14 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:34:14 [ERROR] Response status:
+2025-05-12 16:34:14 [ERROR] Response data:
+2025-05-12 16:34:14 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:34:14 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:34:15 [INFO] Сканирование торговых пар...
+2025-05-12 16:35:15 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:35:15 [ERROR] Response status:
+2025-05-12 16:35:15 [ERROR] Response data:
+2025-05-12 16:35:15 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:35:15 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:35:16 [INFO] Сканирование торговых пар...
+2025-05-12 16:36:16 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:36:16 [ERROR] Response status:
+2025-05-12 16:36:16 [ERROR] Response data:
+2025-05-12 16:36:16 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:36:16 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:36:17 [INFO] Сканирование торговых пар...
+2025-05-12 16:37:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:37:17 [ERROR] Response status:
+2025-05-12 16:37:17 [ERROR] Response data:
+2025-05-12 16:37:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:37:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:37:18 [INFO] Сканирование торговых пар...
+2025-05-12 16:38:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:38:17 [ERROR] Response status:
+2025-05-12 16:38:17 [ERROR] Response data:
+2025-05-12 16:38:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:38:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:38:18 [INFO] Сканирование торговых пар...
+2025-05-12 16:39:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:39:17 [ERROR] Response status:
+2025-05-12 16:39:17 [ERROR] Response data:
+2025-05-12 16:39:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:39:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:39:18 [INFO] Сканирование торговых пар...
+2025-05-12 16:40:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:40:17 [ERROR] Response status:
+2025-05-12 16:40:17 [ERROR] Response data:
+2025-05-12 16:40:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:40:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:40:18 [INFO] Сканирование торговых пар...
+2025-05-12 16:41:17 [ERROR] API Error (GET /api/v2/mix/account/account): Request failed with status code 400
+2025-05-12 16:41:17 [ERROR] Response status:
+2025-05-12 16:41:17 [ERROR] Response data:
+2025-05-12 16:41:17 [ERROR] Код ошибки API: 400172, сообщение: Parameter verification failed
+2025-05-12 16:41:17 [ERROR] Ошибка при обновлении баланса: Request failed with status code 400
+2025-05-12 16:41:18 [INFO] Сканирование торговых пар...
+2025-05-12 16:41:59 [INFO] Data loaded from disk
+2025-05-12 16:41:59 [INFO] Initializing trading bot...
+2025-05-12 16:41:59 [INFO] Загрузка конфигурации из файла
+2025-05-12 16:41:59 [INFO] Тестовое подключение к бирже BitGet...
+2025-05-12 16:41:59 [INFO] BitGet API инициализирован:
+2025-05-12 16:41:59 [INFO] - API Key:
+2025-05-12 16:41:59 [INFO] API Request: GET https://api.bitget.com/api/v2/public/time
+2025-05-12 16:41:59 [INFO] Request headers:
+2025-05-12 16:41:59 [INFO] API Response (GET /api/v2/public/time): 200 OK
+2025-05-12 16:41:59 [INFO] Response data: {"code":"00000","msg":"success","requestTime":1747060919926,"data":{"serverTime":"1747060919927"}}
+2025-05-12 16:41:59 [INFO] Успешное подключение к бирже BitGet
+2025-05-12 16:41:59 [INFO] Запрос балансов для USDT...
+2025-05-12 16:41:59 [INFO] Generating signature for: [1747060919664][GET][/api/v2/mix/account/accounts?productType=USDT-FUTURES&marginCoin=USDT]
+2025-05-12 16:41:59 [INFO] Generated signature: 3Q09WcH8m8...
+2025-05-12 16:41:59 [INFO] API Request: GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES&marginCoin=USDT
+2025-05-12 16:41:59 [INFO] Request params:
+2025-05-12 16:41:59 [INFO] Request headers:
+2025-05-12 16:41:59 [INFO] API Response (GET /api/v2/mix/account/accounts): 200 OK
+2025-05-12 16:41:59 [INFO] Response data: {"code":"00000","msg":"success","requestTime":1747060920232,"data":[{"marginCoin":"USDT","locked":"0","available":"21.17120795","crossedMaxAvailable":"21.17120795","isolatedMaxAvailable":"21.17120795","maxTransferOut":"21.17120795","accountEquity":"21.17120795","usdtEquity":"21.171207959909","btcEquity":"0.000204730408","crossedRiskRate":"0","unrealizedPL":"0","coupon":"0","crossedUnrealizedPL":"","isolatedUnrealizedPL":"","grant":"","unionTotalMargin":"21.17120795","unionAvailable":"21.17120795","unionMm":"0","assetList":[],"assetMode":"single","isolatedMargin":"0","crossedMargin":"0"}]}
+2025-05-12 16:41:59 [INFO] Получен баланс: USDT = 21.17120795
+2025-05-12 16:41:59 [INFO] Дополнительная информация о балансе: {"marginCoin":"USDT","locked":"0","available":"21.17120795","crossedMaxAvailable":"21.17120795","isolatedMaxAvailable":"21.17120795","maxTransferOut":"21.17120795","accountEquity":"21.17120795","usdtEquity":"21.171207959909","btcEquity":"0.000204730408","crossedRiskRate":"0","unrealizedPL":"0","coupon":"0","crossedUnrealizedPL":"","isolatedUnrealizedPL":"","grant":"","unionTotalMargin":"21.17120795","unionAvailable":"21.17120795","unionMm":"0","assetList":[],"assetMode":"single","isolatedMargin":"0","crossedMargin":"0"}
+2025-05-12 16:41:59 [INFO] Текущий баланс USDT: 21.17120795
+2025-05-12 16:41:59 [INFO] Configuration saved to disk
+2025-05-12 16:41:59 [INFO] Trading bot initialized successfully
+2025-05-12 16:41:59 [INFO] Server running on port 5000
+2025-05-12 16:42:10 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:34 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:42:36 [INFO] Сканирование торговых пар...
+2025-05-12 16:42:36 [ERROR] Не удалось отсканировать пары: отсутствует клиент API
+2025-05-12 16:42:47 [INFO] Сканирование торговых пар...
+2025-05-12 16:42:47 [ERROR] Не удалось отсканировать пары: отсутствует клиент API
+2025-05-12 16:42:48 [INFO] Сканирование торговых пар...
+2025-05-12 16:42:48 [ERROR] Не удалось отсканировать пары: отсутствует клиент API
+2025-05-12 16:42:49 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:34 [ERROR] Торговый бот не инициализирован или нет клиента API

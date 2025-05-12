@@ -7,14 +7,21 @@ class IndicatorManager {
     this.indicators = {};
     this.historicalData = {};
     this.signalCount = {};
+    this.client = null;
   }
 
   updateConfig(newConfig) {
     this.config = Object.assign({}, this.config, newConfig);
   }
 
+  setClient(client) {
+    this.client = client;
+  }
+
   async initialize(client, symbols) {
     try {
+      this.client = client; // Сохраняем клиента для использования в других методах
+
       for (const symbol of symbols) {
         // Получаем исторические данные для расчета индикаторов
         await this.loadHistoricalData(client, symbol);
@@ -60,124 +67,126 @@ class IndicatorManager {
       return false;
     }
   }
-// Метод для расчета PAC канала
-calculatePAC(candles, period) {
-  try {
-    const highs = candles.map(candle => candle.high);
-    const lows = candles.map(candle => candle.low);
-    
-    const upperPAC = [];
-    const lowerPAC = [];
-    
-    // Рассчитываем верхний и нижний каналы
-    for (let i = 0; i < candles.length; i++) {
-      if (i < period - 1) {
-        // Для первых точек используем все доступные данные
-        const highestHigh = Math.max(...highs.slice(0, i + 1));
-        const lowestLow = Math.min(...lows.slice(0, i + 1));
-        
-        upperPAC.push(highestHigh);
-        lowerPAC.push(lowestLow);
-      } else {
-        // Для остальных точек используем период
-        const highestHigh = Math.max(...highs.slice(i - period + 1, i + 1));
-        const lowestLow = Math.min(...lows.slice(i - period + 1, i + 1));
-        
-        upperPAC.push(highestHigh);
-        lowerPAC.push(lowestLow);
+
+  // Метод для расчета PAC канала
+  calculatePAC(candles, period) {
+    try {
+      const highs = candles.map(candle => candle.high);
+      const lows = candles.map(candle => candle.low);
+      
+      const upperPAC = [];
+      const lowerPAC = [];
+      
+      // Рассчитываем верхний и нижний каналы
+      for (let i = 0; i < candles.length; i++) {
+        if (i < period - 1) {
+          // Для первых точек используем все доступные данные
+          const highestHigh = Math.max(...highs.slice(0, i + 1));
+          const lowestLow = Math.min(...lows.slice(0, i + 1));
+          
+          upperPAC.push(highestHigh);
+          lowerPAC.push(lowestLow);
+        } else {
+          // Для остальных точек используем период
+          const highestHigh = Math.max(...highs.slice(i - period + 1, i + 1));
+          const lowestLow = Math.min(...lows.slice(i - period + 1, i + 1));
+          
+          upperPAC.push(highestHigh);
+          lowerPAC.push(lowestLow);
+        }
       }
+      
+      return { upper: upperPAC, lower: lowerPAC };
+    } catch (error) {
+      logger.error(`Ошибка при расчете PAC: ${error.message}`);
+      return { upper: [], lower: [] };
     }
-    
-    return { upper: upperPAC, lower: lowerPAC };
-  } catch (error) {
-    logger.error(`Ошибка при расчете PAC: ${error.message}`);
-    return { upper: [], lower: [] };
   }
-}
 
-// Метод для расчета всех индикаторов
-async calculateAllIndicators(symbol) {
-  try {
-    if (!this.historicalData[symbol] || this.historicalData[symbol].length === 0) {
-      logger.warn(`Нет исторических данных для ${symbol}`);
+  // Метод для расчета всех индикаторов
+  async calculateAllIndicators(symbol) {
+    try {
+      if (!this.historicalData[symbol] || this.historicalData[symbol].length === 0) {
+        logger.warn(`Нет исторических данных для ${symbol}`);
+        return false;
+      }
+      
+      const candles = this.historicalData[symbol];
+      
+      // Рассчитываем Heikin Ashi свечи, если включено
+      const processedCandles = this.config.useHAcandles ? 
+        this.calculateHeikinAshi(candles) : candles;
+      
+      // Рассчитываем EMA
+      const fastEMA = this.calculateEMA(processedCandles, this.config.fastEMAlength || 89);
+      const mediumEMA = this.calculateEMA(processedCandles, this.config.mediumEMAlength || 200);
+      const slowEMA = this.calculateEMA(processedCandles, this.config.slowEMAlength || 600);
+      
+      // Рассчитываем фракталы
+      const fractals = this.calculateFractals(processedCandles);
+      
+      // Рассчитываем PAC канал
+      const pacChannel = this.calculatePAC(processedCandles, this.config.pacLength || 34);
+      
+      // Сохраняем все индикаторы
+      this.indicators[symbol] = {
+        candles: processedCandles,
+        ema: {
+          fast: fastEMA,
+          medium: mediumEMA,
+          slow: slowEMA
+        },
+        fractals: fractals,
+        pacChannel: pacChannel,
+        lastUpdate: new Date().getTime()
+      };
+      
+      // Обновляем счетчик сигналов
+      if (!this.signalCount[symbol]) {
+        this.signalCount[symbol] = fractals.buyFractals.length + fractals.sellFractals.length;
+      }
+      
+      logger.info(`Индикаторы для ${symbol} успешно рассчитаны`);
+      return true;
+    } catch (error) {
+      logger.error(`Ошибка при расчете индикаторов для ${symbol}: ${error.message}`);
       return false;
     }
-    
-    const candles = this.historicalData[symbol];
-    
-    // Рассчитываем Heikin Ashi свечи, если включено
-    const processedCandles = this.config.useHAcandles ? 
-      this.calculateHeikinAshi(candles) : candles;
-    
-    // Рассчитываем EMA
-    const fastEMA = this.calculateEMA(processedCandles, this.config.fastEMAlength || 89);
-    const mediumEMA = this.calculateEMA(processedCandles, this.config.mediumEMAlength || 200);
-    const slowEMA = this.calculateEMA(processedCandles, this.config.slowEMAlength || 600);
-    
-    // Рассчитываем фракталы
-    const fractals = this.calculateFractals(processedCandles);
-    
-    // Рассчитываем PAC канал
-    const pacChannel = this.calculatePAC(processedCandles, this.config.pacLength || 34);
-    
-    // Сохраняем все индикаторы
-    this.indicators[symbol] = {
-      candles: processedCandles,
-      ema: {
-        fast: fastEMA,
-        medium: mediumEMA,
-        slow: slowEMA
-      },
-      fractals: fractals,
-      pacChannel: pacChannel,
-      lastUpdate: new Date().getTime()
-    };
-    
-    // Обновляем счетчик сигналов
-    if (!this.signalCount[symbol]) {
-      this.signalCount[symbol] = fractals.buyFractals.length + fractals.sellFractals.length;
-    }
-    
-    logger.info(`Индикаторы для ${symbol} успешно рассчитаны`);
-    return true;
-  } catch (error) {
-    logger.error(`Ошибка при расчете индикаторов для ${symbol}: ${error.message}`);
-    return false;
   }
-}
 
-// Метод для обновления индикаторов
-async updateIndicators() {
-  try {
-    if (!this.client) {
-      logger.warn('Не удалось обновить индикаторы: отсутствует клиент API');
+  // Метод для обновления индикаторов
+  async updateIndicators() {
+    try {
+      if (!this.client) {
+        logger.warn('Не удалось обновить индикаторы: отсутствует клиент API');
+        return false;
+      }
+      
+      for (const symbol of Object.keys(this.indicators)) {
+        await this.loadHistoricalData(this.client, symbol);
+        await this.calculateAllIndicators(symbol);
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error(`Ошибка при обновлении индикаторов: ${error.message}`);
       return false;
     }
-    
-    for (const symbol of Object.keys(this.indicators)) {
-      await this.loadHistoricalData(this.client, symbol);
-      await this.calculateAllIndicators(symbol);
-    }
-    
-    return true;
-  } catch (error) {
-    logger.error(`Ошибка при обновлении индикаторов: ${error.message}`);
-    return false;
   }
-}
 
-// Метод для обновления исторических данных
-async updateHistoricalData(client, symbols) {
-  try {
-    for (const symbol of symbols) {
-      await this.loadHistoricalData(client, symbol);
+  // Метод для обновления исторических данных
+  async updateHistoricalData(client, symbols) {
+    try {
+      for (const symbol of symbols) {
+        await this.loadHistoricalData(client, symbol);
+      }
+      return true;
+    } catch (error) {
+      logger.error(`Ошибка при обновлении исторических данных: ${error.message}`);
+      return false;
     }
-    return true;
-  } catch (error) {
-    logger.error(`Ошибка при обновлении исторических данных: ${error.message}`);
-    return false;
   }
-}
+
   // Основные методы для расчета индикаторов
   calculateHeikinAshi(candles) {
     const haCandles = [];

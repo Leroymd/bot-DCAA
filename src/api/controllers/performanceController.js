@@ -19,7 +19,7 @@ exports.getPerformance = function(req, res) {
     
     return res.json({
       success: true,
-      data: performanceData
+      data: performanceData || {}
     });
   } catch (error) {
     logger.error('Ошибка получения данных о производительности: ' + error.message);

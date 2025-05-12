@@ -35,9 +35,9 @@ exports.getIndicatorsStatus = async function(req, res) {
     const tradingBot = getBot();
     
     if (!tradingBot || !tradingBot.indicatorManager) {
-      return res.status(500).json({
-        success: false,
-        message: 'Торговый бот не правильно инициализирован'
+      return res.json({
+        success: true,
+        data: {}
       });
     }
     
