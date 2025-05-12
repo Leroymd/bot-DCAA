@@ -1,4 +1,3 @@
-// 2. Обновим signalsController.js для получения реальных сигналов
 // src/api/controllers/signalsController.js
 const logger = require('../../utils/logger');
 const dataStore = require('../../utils/dataStore');
