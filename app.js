@@ -13,7 +13,7 @@ var pairsRoutes = require('./src/api/routes/pairsRoutes');
 var signalRoutes = require('./src/api/routes/signalRoutes');
 var performanceRoutes = require('./src/api/routes/performanceRoutes');
 var settingsRoutes = require('./src/api/routes/settingsRoutes');
-
+var positionRoutes = require('./src/api/routes/positionRoutes');
 // Создаем Express-приложение
 var app = express();
 
@@ -21,7 +21,7 @@ var app = express();
 app.use(cors(config.cors));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use('/api/position', positionRoutes);
 // Простая проверка API ключа для безопасности (опционально)
 var apiKeyMiddleware = function(req, res, next) {
   // В режиме разработки пропускаем проверку

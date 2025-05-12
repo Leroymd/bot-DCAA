@@ -318,3 +318,107 @@
 2025-05-12 16:43:04 [ERROR] Торговый бот не инициализирован или нет клиента API
 2025-05-12 16:43:19 [ERROR] Торговый бот не инициализирован или нет клиента API
 2025-05-12 16:43:34 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:43:49 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:44:04 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:44:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:44:34 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:45:11 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:45:19 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:56:32 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:32 [ERROR] Response status:
+2025-05-12 16:56:32 [ERROR] Response data:
+2025-05-12 16:56:32 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:32 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:32 [ERROR] Response status:
+2025-05-12 16:56:32 [ERROR] Response data:
+2025-05-12 16:56:32 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:32 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:32 [ERROR] Response status:
+2025-05-12 16:56:32 [ERROR] Response data:
+2025-05-12 16:56:32 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:32 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:32 [ERROR] Response status:
+2025-05-12 16:56:32 [ERROR] Response data:
+2025-05-12 16:56:32 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:33 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:33 [ERROR] Response status:
+2025-05-12 16:56:33 [ERROR] Response data:
+2025-05-12 16:56:33 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:33 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:33 [ERROR] Response status:
+2025-05-12 16:56:33 [ERROR] Response data:
+2025-05-12 16:56:33 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:34 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:34 [ERROR] Response status:
+2025-05-12 16:56:34 [ERROR] Response data:
+2025-05-12 16:56:34 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:34 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:34 [ERROR] Response status:
+2025-05-12 16:56:34 [ERROR] Response data:
+2025-05-12 16:56:34 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:34 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:34 [ERROR] Response status:
+2025-05-12 16:56:34 [ERROR] Response data:
+2025-05-12 16:56:34 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:56:35 [ERROR] API Error (GET /api/v2/mix/order/history): Request failed with status code 404
+2025-05-12 16:56:35 [ERROR] Response status:
+2025-05-12 16:56:35 [ERROR] Response data:
+2025-05-12 16:56:35 [ERROR] Код ошибки API: 40404, сообщение: Request URL NOT FOUND
+2025-05-12 16:57:36 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:57:42 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:57:42 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 16:59:05 [ERROR] API Error (POST /api/v2/mix/order/place-order): Request failed with status code 400
+2025-05-12 16:59:05 [ERROR] Response status:
+2025-05-12 16:59:05 [ERROR] Response data:
+2025-05-12 16:59:05 [ERROR] Код ошибки API: 40762, сообщение: The order amount exceeds the balance
+2025-05-12 16:59:05 [ERROR] Ошибка размещения ордера: Request failed with status code 400
+2025-05-12 16:59:05 [ERROR] Данные ответа:
+2025-05-12 16:59:05 [ERROR] Статус ответа:
+2025-05-12 16:59:05 [ERROR] Ошибка при открытии позиции: Request failed with status code 400
+2025-05-12 17:00:16 [ERROR] API Error (POST /api/v2/mix/order/place-order): Request failed with status code 400
+2025-05-12 17:00:16 [ERROR] Response status:
+2025-05-12 17:00:16 [ERROR] Response data:
+2025-05-12 17:00:16 [ERROR] Код ошибки API: 45111, сообщение: less than the minimum order quantity
+2025-05-12 17:00:16 [ERROR] Ошибка размещения ордера: Request failed with status code 400
+2025-05-12 17:00:16 [ERROR] Данные ответа:
+2025-05-12 17:00:16 [ERROR] Статус ответа:
+2025-05-12 17:00:16 [ERROR] Ошибка при открытии позиции: Request failed with status code 400
+2025-05-12 17:02:37 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:02:42 [ERROR] Ошибка при открытии позиции: Cannot read properties of null (reading 'getTicker')
+2025-05-12 17:02:52 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:03:07 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:03:12 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:03:12 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:04:27 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:04:31 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:04:32 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:05:46 [ERROR] API Error (POST /api/v2/mix/order/place-order): Request failed with status code 400
+2025-05-12 17:05:46 [ERROR] Response status:
+2025-05-12 17:05:46 [ERROR] Response data:
+2025-05-12 17:05:46 [ERROR] Код ошибки API: 45110, сообщение: less than the minimum amount 5 USDT
+2025-05-12 17:05:46 [ERROR] Ошибка размещения ордера: Request failed with status code 400
+2025-05-12 17:05:46 [ERROR] Данные ответа:
+2025-05-12 17:05:46 [ERROR] Статус ответа:
+2025-05-12 17:05:46 [ERROR] Ошибка при открытии позиции: Request failed with status code 400
+2025-05-12 17:06:22 [ERROR] API Error (POST /api/v2/mix/order/place-tpsl-order): Request failed with status code 400
+2025-05-12 17:06:22 [ERROR] Response status:
+2025-05-12 17:06:22 [ERROR] Response data:
+2025-05-12 17:06:22 [ERROR] Код ошибки API: 400172, сообщение: The position direction cannot be empty
+2025-05-12 17:26:00 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:26:00 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:27:27 [ERROR] API Error (POST /api/v2/mix/order/place-order): Request failed with status code 400
+2025-05-12 17:27:27 [ERROR] Response status:
+2025-05-12 17:27:27 [ERROR] Response data:
+2025-05-12 17:27:27 [ERROR] Код ошибки API: 45110, сообщение: less than the minimum amount 5 USDT
+2025-05-12 17:27:27 [ERROR] Ошибка размещения ордера: Request failed with status code 400
+2025-05-12 17:27:27 [ERROR] Данные ответа:
+2025-05-12 17:27:27 [ERROR] Статус ответа:
+2025-05-12 17:27:27 [ERROR] Ошибка при открытии позиции: Request failed with status code 400
+2025-05-12 17:27:57 [ERROR] API Error (POST /api/v2/mix/order/place-order): Request failed with status code 400
+2025-05-12 17:27:57 [ERROR] Response status:
+2025-05-12 17:27:57 [ERROR] Response data:
+2025-05-12 17:27:57 [ERROR] Код ошибки API: 45110, сообщение: less than the minimum amount 5 USDT
+2025-05-12 17:27:57 [ERROR] Ошибка размещения ордера: Request failed with status code 400
+2025-05-12 17:27:57 [ERROR] Данные ответа:
+2025-05-12 17:27:57 [ERROR] Статус ответа:
+2025-05-12 17:27:57 [ERROR] Ошибка при открытии позиции: Request failed with status code 400

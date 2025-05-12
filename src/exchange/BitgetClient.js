@@ -1,3 +1,4 @@
+// src/exchange/BitGetClient.js
 const axios = require('axios');
 const crypto = require('crypto');
 const querystring = require('querystring');
@@ -212,8 +213,6 @@ class BitGetClient {
       throw error;
     }
   }
-
-  // Удаляем метод getAccountInfo и используем getAccountAssets вместо него
   
   async getPositions(symbol, marginCoin = 'USDT') {
     const params = { productType: "USDT-FUTURES" };
@@ -380,6 +379,13 @@ class BitGetClient {
       return Promise.reject(new Error(`Неверное значение стороны: ${side}`));
     }
 
+    // Проверяем значение tradeSide
+    const validTradeSide = tradeSide.toLowerCase();
+    if (validTradeSide !== 'open' && validTradeSide !== 'close') {
+      logger.error(`Неверное значение tradeSide: ${tradeSide}`);
+      return Promise.reject(new Error(`Неверное значение tradeSide. Допустимые значения: open, close`));
+    }
+
     try {
       const params = {
         symbol,
@@ -390,11 +396,11 @@ class BitGetClient {
         force: 'gtc',
         marginMode: 'isolated',
         clientOid: `order_${Date.now()}`,
-        tradeSide: tradeSide
+        tradeSide: validTradeSide
       };
 
       if (reduceOnly === true) {
-        params.tradeSide = "close";
+        params.tradeSide = "close"; // Всегда используем close при reduceOnly=true
       }
 
       if (orderType.toLowerCase() === 'limit' && price) {
@@ -448,30 +454,60 @@ class BitGetClient {
   
   // Метод для установки стоп-лосса и тейк-профита
   async setTpsl(symbol, positionSide, planType, triggerPrice, size) {
-    return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, {
+    // Для Bitget positionSide должен быть 'long' или 'short'
+    const normalizedPositionSide = positionSide.toLowerCase();
+    
+    if (normalizedPositionSide !== 'long' && normalizedPositionSide !== 'short') {
+      logger.error(`Неверное значение направления позиции: ${positionSide}`);
+      return Promise.reject(new Error(`Неверное значение направления позиции: ${positionSide}`));
+    }
+    
+    if (!planType || (planType !== 'profit_plan' && planType !== 'loss_plan')) {
+      logger.error(`Неверное значение типа плана: ${planType}`);
+      return Promise.reject(new Error(`Неверный тип плана. Допустимые значения: profit_plan, loss_plan`));
+    }
+    
+    const params = {
       symbol,
       marginCoin: 'USDT',
-      planType, // "profit_plan" или "loss_plan"
+      planType,
       triggerPrice: triggerPrice.toString(),
       size: size.toString(),
-      positionSide, // "long" или "short"
+      positionSide: normalizedPositionSide,
       productType: "USDT-FUTURES"
-    });
+    };
+    
+    if (this.debug) {
+      logger.info(`Установка ${planType === 'profit_plan' ? 'тейк-профита' : 'стоп-лосса'} для ${symbol}: ${JSON.stringify(params)}`);
+    }
+    
+    return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, params);
   }
   
   // Метод для установки трейлинг-стопа
   async setTrailingStop(symbol, positionSide, callbackRatio, size) {
-    return this.request('POST', '/api/v2/mix/order/place-plan-order', {}, {
+    // Для Bitget нужно преобразовать positionSide в side (buy/sell)
+    // long -> sell (для закрытия long позиции нужно sell)
+    // short -> buy (для закрытия short позиции нужно buy)
+    const side = positionSide.toLowerCase() === "long" ? "sell" : "buy";
+    
+    const params = {
       symbol,
       marginCoin: 'USDT',
       planType: "trailing_stop_plan",
       callbackRatio: callbackRatio.toString(),
       size: size.toString(),
-      side: positionSide === "long" ? "sell" : "buy",
+      side: side,
       triggerType: "market_price",
-      tradeSide: "close",
+      tradeSide: "close", // Важно указать close для закрытия позиции
       productType: "USDT-FUTURES"
-    });
+    };
+    
+    if (this.debug) {
+      logger.info(`Установка трейлинг-стопа для ${symbol}: ${JSON.stringify(params)}`);
+    }
+    
+    return this.request('POST', '/api/v2/mix/order/place-plan-order', {}, params);
   }
 }
 
