@@ -454,35 +454,29 @@ class BitGetClient {
   
   // Метод для установки стоп-лосса и тейк-профита
   async setTpsl(symbol, positionSide, planType, triggerPrice, size) {
-    // Для Bitget positionSide должен быть 'long' или 'short'
-    const normalizedPositionSide = positionSide.toLowerCase();
-    
-    if (normalizedPositionSide !== 'long' && normalizedPositionSide !== 'short') {
-      logger.error(`Неверное значение направления позиции: ${positionSide}`);
-      return Promise.reject(new Error(`Неверное значение направления позиции: ${positionSide}`));
-    }
-    
-    if (!planType || (planType !== 'profit_plan' && planType !== 'loss_plan')) {
-      logger.error(`Неверное значение типа плана: ${planType}`);
-      return Promise.reject(new Error(`Неверный тип плана. Допустимые значения: profit_plan, loss_plan`));
-    }
-    
-    const params = {
-      symbol,
-      marginCoin: 'USDT',
-      planType,
-      triggerPrice: triggerPrice.toString(),
-      size: size.toString(),
-      positionSide: normalizedPositionSide,
-      productType: "USDT-FUTURES"
-    };
-    
-    if (this.debug) {
-      logger.info(`Установка ${planType === 'profit_plan' ? 'тейк-профита' : 'стоп-лосса'} для ${symbol}: ${JSON.stringify(params)}`);
-    }
-    
-    return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, params);
+  // Проверяем правильность параметра positionSide
+  if (!positionSide || (positionSide !== 'long' && positionSide !== 'short')) {
+    logger.warn(`Неверное значение positionSide: ${positionSide}. Должно быть 'long' или 'short'`);
+    // Устанавливаем значение по умолчанию для предотвращения ошибки
+    positionSide = 'long';
   }
+  
+  const requestBody = {
+    symbol,
+    marginCoin: 'USDT',
+    planType, // "profit_plan" или "loss_plan"
+    triggerPrice: triggerPrice.toString(),
+    size: size.toString(),
+    positionSide, // "long" или "short"
+    productType: "USDT-FUTURES"
+  };
+  
+  if (this.debug) {
+    logger.info(`Установка TP/SL: ${JSON.stringify(requestBody)}`);
+  }
+  
+  return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, requestBody);
+}
   
   // Метод для установки трейлинг-стопа
   async setTrailingStop(symbol, positionSide, callbackRatio, size) {

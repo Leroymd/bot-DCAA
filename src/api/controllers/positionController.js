@@ -1,4 +1,4 @@
-// src/api/controllers/positionController.js - исправленная версия
+// src/api/controllers/positionController.js
 const logger = require('../../utils/logger');
 const { getBot } = require('../../bot/setup');
 
@@ -132,16 +132,39 @@ exports.closePosition = async function(req, res) {
       });
     }
     
-    const { positionId } = req.body;
+    // Расширенное логирование тела запроса для отладки
+    logger.info(`Тело запроса на закрытие позиции: ${JSON.stringify(req.body)}`);
     
+    // Извлекаем positionId в нескольких вариантах для обеспечения совместимости
+    let positionId = req.body.positionId;
+    
+    // Проверка на случай других вариантов именования параметра
+    if (!positionId && req.body.id) {
+      positionId = req.body.id;
+    }
+    
+    // Если всё ещё нет positionId, завершаем с ошибкой
     if (!positionId) {
+      logger.error('Не указан ID позиции в запросе на закрытие');
       return res.status(400).json({
         success: false,
         message: 'Не указан ID позиции для закрытия'
       });
     }
     
-    logger.info(`Запрос на закрытие позиции: ${positionId}`);
+    logger.info(`Запрос на закрытие позиции с ID: ${positionId}`);
+    
+    // Получаем текущие открытые позиции для проверки
+    const openPositions = await tradingBot.positionManager.updateOpenPositions();
+    logger.info(`Текущие открытые позиции: ${JSON.stringify(openPositions.map(p => ({ id: p.id, symbol: p.symbol })))}`);
+    
+    // Пытаемся найти позицию по ID
+    const position = openPositions.find(p => String(p.id) === String(positionId));
+    
+    if (!position) {
+      logger.warn(`Позиция с ID ${positionId} не найдена в списке открытых позиций`);
+      // Пробуем закрыть позицию в любом случае
+    }
     
     // Закрываем позицию
     const result = await tradingBot.positionManager.closePosition(positionId, 100);

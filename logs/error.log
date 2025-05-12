@@ -422,3 +422,9 @@
 2025-05-12 17:27:57 [ERROR] Данные ответа:
 2025-05-12 17:27:57 [ERROR] Статус ответа:
 2025-05-12 17:27:57 [ERROR] Ошибка при открытии позиции: Request failed with status code 400
+2025-05-12 17:39:13 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:39:18 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:39:18 [ERROR] Торговый бот не инициализирован или нет клиента API
+2025-05-12 17:51:33 [ERROR] Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
+2025-05-12 17:51:45 [ERROR] Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
+2025-05-12 17:53:04 [ERROR] Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]

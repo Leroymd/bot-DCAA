@@ -7,3 +7,42 @@ Error: listen EADDRINUSE: address already in use :::5000
     at C:\Users\leroy\Desktop\bot-DCA\app.js:92:11
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
 
+2025-05-12T15:51:33.230Z Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
+Error: Route.get() requires a callback function but got a [object Undefined]
+    at Route.<computed> [as get] (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\router\route.js:216:15)
+    at proto.<computed> [as get] (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\router\index.js:521:19)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js:11:8)
+    at Module._compile (node:internal/modules/cjs/loader:1734:14)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+
+2025-05-12T15:51:45.157Z Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
+Error: Route.get() requires a callback function but got a [object Undefined]
+    at Route.<computed> [as get] (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\router\route.js:216:15)
+    at proto.<computed> [as get] (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\router\index.js:521:19)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js:11:8)
+    at Module._compile (node:internal/modules/cjs/loader:1734:14)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+
+2025-05-12T15:53:04.568Z Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
+Error: Route.get() requires a callback function but got a [object Undefined]
+    at Route.<computed> [as get] (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\router\route.js:216:15)
+    at proto.<computed> [as get] (C:\Users\leroy\Desktop\bot-DCA\node_modules\express\lib\router\index.js:521:19)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js:11:8)
+    at Module._compile (node:internal/modules/cjs/loader:1734:14)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+

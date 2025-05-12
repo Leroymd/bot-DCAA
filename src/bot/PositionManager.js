@@ -189,66 +189,74 @@ class PositionManager extends EventEmitter {
       
       // Получаем обновленную информацию о позиции для TP/SL
       try {
-        await this.updateOpenPositions();
-        
-        // Получаем обновленные позиции
-        const updatedPositions = await this.client.getPositions(symbol);
-        if (updatedPositions && updatedPositions.data && updatedPositions.data.length > 0) {
-          const matchingPosition = updatedPositions.data.find(p => 
-            p.symbol === symbol && 
-            p.holdSide.toUpperCase() === type.toUpperCase() && 
-            parseFloat(p.total) > 0
-          );
-          
-          if (matchingPosition) {
-            // Устанавливаем стоп-лосс и тейк-профит
-            if (this.config.stopLossPercentage > 0) {
-              const stopPrice = type === 'LONG' 
-                ? price * (1 - this.config.stopLossPercentage / 100) 
-                : price * (1 + this.config.stopLossPercentage / 100);
-              
-              // Для API Bitget
-              await this.client.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, {
-                symbol: symbol,
-                marginCoin: 'USDT',
-                planType: 'loss_plan',
-                triggerPrice: stopPrice.toFixed(5),
-                size: formattedSize,
-                positionSide: type.toLowerCase(),
-                holdSide: type.toLowerCase(),  // Добавляем holdSide
-                direction: type === 'LONG' ? 'close_long' : 'close_short',  // Добавляем direction
-                productType: "USDT-FUTURES"
-              });
-              
-              logger.info(`Установлен стоп-лосс для ${symbol} на уровне ${stopPrice.toFixed(5)}`);
-            }
-            
-            if (this.config.takeProfitPercentage > 0) {
-              const takeProfitPrice = type === 'LONG' 
-                ? price * (1 + this.config.takeProfitPercentage / 100) 
-                : price * (1 - this.config.takeProfitPercentage / 100);
-              
-              // Для API Bitget
-              await this.client.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, {
-                symbol: symbol,
-                marginCoin: 'USDT',
-                planType: 'profit_plan',
-                triggerPrice: takeProfitPrice.toFixed(5),
-                size: formattedSize,
-                positionSide: type.toLowerCase(), 
-                holdSide: type.toLowerCase(),  // Добавляем holdSide
-                direction: type === 'LONG' ? 'close_long' : 'close_short',  // Добавляем direction
-                productType: "USDT-FUTURES"
-              });
-              
-              logger.info(`Установлен тейк-профит для ${symbol} на уровне ${takeProfitPrice.toFixed(5)}`);
-            }
-          } else {
-            logger.warn(`Не удалось найти открытую позицию ${type} ${symbol} для установки TP/SL`);
-          }
-        }
-      } catch (tpslError) {
-        logger.warn(`Не удалось установить TP/SL: ${tpslError.message}`);
+  // Добавляем задержку перед установкой TP/SL
+  // для того, чтобы биржа успела обработать открытие позиции
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Получаем актуальные позиции с биржи
+  const positionsResponse = await this.client.getPositions(symbol);
+  let foundPosition = null;
+  
+  if (positionsResponse && positionsResponse.data && Array.isArray(positionsResponse.data)) {
+    // Ищем нашу позицию по символу и стороне
+    foundPosition = positionsResponse.data.find(pos => 
+      pos.symbol === symbol && 
+      pos.holdSide.toUpperCase() === type.toLowerCase()
+    );
+  }
+  
+  if (!foundPosition) {
+    logger.warn(`Не удалось найти открытую позицию ${type} ${symbol} для установки TP/SL`);
+    return newPosition;
+  }
+  
+  // Правильно определяем positionSide для API
+  const positionSide = type.toLowerCase(); // Должно быть "long" или "short"
+  
+  // Устанавливаем стоп-лосс
+  if (this.config.stopLossPercentage > 0) {
+    const stopPrice = type === 'LONG' 
+      ? price * (1 - this.config.stopLossPercentage / 100) 
+      : price * (1 + this.config.stopLossPercentage / 100);
+    
+    const stopLossResponse = await this.client.setTpsl(
+      symbol,
+      positionSide,
+      'loss_plan',
+      stopPrice.toFixed(5),
+      formattedSize
+    );
+    
+    if (stopLossResponse && stopLossResponse.code === '00000') {
+      logger.info(`Установлен стоп-лосс для ${symbol} на уровне ${stopPrice.toFixed(5)}`);
+    } else {
+      logger.warn(`Не удалось установить стоп-лосс: ${stopLossResponse ? stopLossResponse.msg : 'Нет ответа от API'}`);
+    }
+  }
+  
+  // Устанавливаем тейк-профит
+  if (this.config.takeProfitPercentage > 0) {
+    const takeProfitPrice = type === 'LONG' 
+      ? price * (1 + this.config.takeProfitPercentage / 100) 
+      : price * (1 - this.config.takeProfitPercentage / 100);
+    
+    const takeProfitResponse = await this.client.setTpsl(
+      symbol,
+      positionSide,
+      'profit_plan',
+      takeProfitPrice.toFixed(5),
+      formattedSize
+    );
+    
+    if (takeProfitResponse && takeProfitResponse.code === '00000') {
+      logger.info(`Установлен тейк-профит для ${symbol} на уровне ${takeProfitPrice.toFixed(5)}`);
+    } else {
+      logger.warn(`Не удалось установить тейк-профит: ${takeProfitResponse ? takeProfitResponse.msg : 'Нет ответа от API'}`);
+    }
+  }
+} catch (tpslError) {
+  logger.warn(`Ошибка при установке TP/SL: ${tpslError.message}`);
+
       }
       
       // Добавляем позицию в список открытых
