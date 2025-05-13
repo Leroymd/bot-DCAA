@@ -5,6 +5,7 @@ const router = express.Router();
 
 // Маршруты для управления позициями
 router.post('/open', positionController.openPosition);
+router.post('/close/:positionId', positionController.closePosition); // Новый маршрут с параметром
 router.post('/close', positionController.closePosition);
 
 // Добавляем роуты для отладки

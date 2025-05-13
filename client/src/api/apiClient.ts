@@ -120,7 +120,13 @@ export const api = {
       return response.data;
     },
     close: async (positionId: string): Promise<ApiResponse> => {
-      const response = await apiClient.post<ApiResponse>('/position/close', { positionId });
+      console.log('API Client: closing position with ID:', positionId); // Отладочный лог
+      
+      // Явно передаем positionId в формате объекта
+      const requestData = { positionId: positionId };
+      console.log('API Client: sending request data:', requestData); // Отладочный лог
+      
+      const response = await apiClient.post<ApiResponse>('/position/close', requestData);
       return response.data;
     }
   }

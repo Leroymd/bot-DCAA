@@ -367,6 +367,56 @@ class BitGetClient {
     }
   }
 
+  // Функция для получения информации о символе и его правилах
+  async getSymbolInfo(symbol) {
+    try {
+      const response = await this.request('GET', '/api/v2/mix/market/contracts', {
+        productType: "USDT-FUTURES"
+      });
+      
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        logger.warn(`Не удалось получить информацию о символе ${symbol}`);
+        return null;
+      }
+      
+      // Ищем наш символ в списке
+      const symbolInfo = response.data.find(item => item.symbol === symbol);
+      if (!symbolInfo) {
+        logger.warn(`Символ ${symbol} не найден в списке доступных`);
+        return null;
+      }
+      
+      return symbolInfo;
+    } catch (error) {
+      logger.error(`Ошибка при получении информации о символе ${symbol}: ${error.message}`);
+      return null;
+    }
+  }
+
+  // Функция для форматирования цены с учетом минимального шага
+  formatPrice(price, symbol) {
+    // Форматирование цены в строку с точностью, подходящей для данного символа
+    try {
+      // Если символ уже содержит информацию о minPriceStep
+      if (typeof symbol === 'object' && symbol.minPriceStep) {
+        const precision = this.countDecimals(symbol.minPriceStep);
+        return parseFloat(price).toFixed(precision);
+      }
+      
+      // По умолчанию используем 4 знака после запятой
+      return parseFloat(price).toFixed(4);
+    } catch (error) {
+      logger.warn(`Ошибка форматирования цены: ${error.message}, возвращаем исходное значение`);
+      return price.toString();
+    }
+  }
+
+  // Вспомогательная функция для подсчета количества знаков после запятой
+  countDecimals(value) {
+    if (Math.floor(value) === value) return 0;
+    return value.toString().split(".")[1].length || 0;
+  }
+
   async placeOrder(symbol, side, orderType, size, price = null, reduceOnly = false, tradeSide = "open") {
     if (!symbol) {
       const error = new Error('Для размещения ордера необходим символ');
@@ -387,24 +437,40 @@ class BitGetClient {
     }
 
     try {
+      // Для лимитных ордеров получаем информацию о символе для правильного форматирования цены
+      let formattedPrice = price;
+      if (orderType.toLowerCase() === 'limit' && price) {
+        // Получаем информацию о символе для правильного форматирования цены
+        const symbolInfo = await this.getSymbolInfo(symbol);
+        if (symbolInfo) {
+          formattedPrice = this.formatPrice(price, symbolInfo);
+          logger.info(`Отформатированная цена для ${symbol}: ${formattedPrice} (исходная: ${price})`);
+        }
+      }
+
       const params = {
         symbol,
         marginCoin: 'USDT',
         size: size.toString(),
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
-        force: 'gtc',
+        force: 'gtc', // Good-Till-Cancel
         marginMode: 'isolated',
         clientOid: `order_${Date.now()}`,
-        tradeSide: validTradeSide
+        tradeSide: validTradeSide,
+        productType: "USDT-FUTURES"
       };
 
       if (reduceOnly === true) {
         params.tradeSide = "close"; // Всегда используем close при reduceOnly=true
+        params.reduceOnly = "YES"; // Bitget требует строку "YES"
       }
 
-      if (orderType.toLowerCase() === 'limit' && price) {
-        params.price = price.toString();
+      if (orderType.toLowerCase() === 'limit' && formattedPrice) {
+        params.price = formattedPrice.toString();
+        // Для Bitget V2 API нужно использовать timeInForce вместо force
+        params.timeInForce = params.force;
+        delete params.force;
       }
 
       if (this.debug) {
@@ -454,29 +520,38 @@ class BitGetClient {
   
   // Метод для установки стоп-лосса и тейк-профита
   async setTpsl(symbol, positionSide, planType, triggerPrice, size) {
-  // Проверяем правильность параметра positionSide
-  if (!positionSide || (positionSide !== 'long' && positionSide !== 'short')) {
-    logger.warn(`Неверное значение positionSide: ${positionSide}. Должно быть 'long' или 'short'`);
-    // Устанавливаем значение по умолчанию для предотвращения ошибки
-    positionSide = 'long';
+    // Проверяем правильность параметра positionSide
+    if (!positionSide || (positionSide !== 'long' && positionSide !== 'short')) {
+      logger.warn(`Неверное значение positionSide: ${positionSide}. Должно быть 'long' или 'short'`);
+      // Устанавливаем значение по умолчанию для предотвращения ошибки
+      positionSide = 'long';
+    }
+    
+    // Получаем информацию о символе для правильного форматирования цены
+    const symbolInfo = await this.getSymbolInfo(symbol);
+    let formattedTriggerPrice = triggerPrice;
+    
+    if (symbolInfo) {
+      formattedTriggerPrice = this.formatPrice(triggerPrice, symbolInfo);
+      logger.info(`Отформатированная цена триггера для ${symbol}: ${formattedTriggerPrice} (исходная: ${triggerPrice})`);
+    }
+  
+    const requestBody = {
+      symbol,
+      marginCoin: 'USDT',
+      planType, // "profit_plan" или "loss_plan"
+      triggerPrice: formattedTriggerPrice.toString(),
+      size: size.toString(),
+      positionSide, // "long" или "short"
+      productType: "USDT-FUTURES"
+    };
+    
+    if (this.debug) {
+      logger.info(`Установка TP/SL: ${JSON.stringify(requestBody)}`);
+    }
+    
+    return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, requestBody);
   }
-  
-  const requestBody = {
-    symbol,
-    marginCoin: 'USDT',
-    planType, // "profit_plan" или "loss_plan"
-    triggerPrice: triggerPrice.toString(),
-    size: size.toString(),
-    positionSide, // "long" или "short"
-    productType: "USDT-FUTURES"
-  };
-  
-  if (this.debug) {
-    logger.info(`Установка TP/SL: ${JSON.stringify(requestBody)}`);
-  }
-  
-  return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, requestBody);
-}
   
   // Метод для установки трейлинг-стопа
   async setTrailingStop(symbol, positionSide, callbackRatio, size) {

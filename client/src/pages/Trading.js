@@ -1,4 +1,5 @@
-// client/src/pages/Trading.js
+// Полный файл client/src/pages/Trading.js с исправленной функцией closePosition
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AlertCircle, ArrowUp, ArrowDown, X } from 'lucide-react';
@@ -43,7 +44,21 @@ const Trading = () => {
   
   const closePosition = async (positionId) => {
     try {
-      const response = await axios.post('/api/position/close', { positionId });
+      // Find the position to get its symbol
+      const position = activePositions.find(position => position.id === positionId);
+      if (!position) {
+        setError('Не удалось найти позицию для закрытия');
+        return;
+      }
+
+      // Логируем данные позиции для отладки
+      console.log(`Закрытие позиции: ID=${positionId}, символ=${position.pair}`);
+      
+      // Отправляем запрос на закрытие позиции с ID и символом
+      const response = await axios.post('/api/position/close', {
+        positionId: positionId,
+        symbol: position.pair
+      });
       
       if (response.data.success) {
         // Обновляем список позиций

@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { api } from '../api/apiClient';
 import { TradingPair, OrderFormData } from '../types';
 import { useAppContext } from '../contexts/AppContext';
+import axios from 'axios';
 
 const Trading: React.FC = () => {
   const { botStatus, loading: botLoading, error: botError } = useAppContext();
@@ -47,14 +48,28 @@ const Trading: React.FC = () => {
   
   const closePosition = async (positionId: string) => {
     try {
-      const response = await api.position.close(positionId);
+      // Find the position to get its symbol
+      const position = activePositions.find(position => position.id === positionId);
+      if (!position) {
+        setError('Не удалось найти позицию для закрытия');
+        return;
+      }
+
+      // Логируем данные позиции для отладки
+      console.log(`Закрытие позиции: ID=${positionId}, символ=${position.pair}`);
       
-      if (response.success) {
+      // Отправляем запрос на закрытие позиции с ID и символом пары
+      const response = await axios.post('/api/position/close', {
+        positionId: positionId,
+        symbol: position.pair
+      });
+      
+      if (response.data.success) {
         // Обновляем список позиций
         const updatedPositions = activePositions.filter(position => position.id !== positionId);
         setActivePositions(updatedPositions);
       } else {
-        setError(response.message || 'Не удалось закрыть позицию');
+        setError(response.data.message || 'Не удалось закрыть позицию');
       }
     } catch (err) {
       console.error('Error closing position:', err);

@@ -189,74 +189,73 @@ class PositionManager extends EventEmitter {
       
       // Получаем обновленную информацию о позиции для TP/SL
       try {
-  // Добавляем задержку перед установкой TP/SL
-  // для того, чтобы биржа успела обработать открытие позиции
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Получаем актуальные позиции с биржи
-  const positionsResponse = await this.client.getPositions(symbol);
-  let foundPosition = null;
-  
-  if (positionsResponse && positionsResponse.data && Array.isArray(positionsResponse.data)) {
-    // Ищем нашу позицию по символу и стороне
-    foundPosition = positionsResponse.data.find(pos => 
-      pos.symbol === symbol && 
-      pos.holdSide.toUpperCase() === type.toLowerCase()
-    );
-  }
-  
-  if (!foundPosition) {
-    logger.warn(`Не удалось найти открытую позицию ${type} ${symbol} для установки TP/SL`);
-    return newPosition;
-  }
-  
-  // Правильно определяем positionSide для API
-  const positionSide = type.toLowerCase(); // Должно быть "long" или "short"
-  
-  // Устанавливаем стоп-лосс
-  if (this.config.stopLossPercentage > 0) {
-    const stopPrice = type === 'LONG' 
-      ? price * (1 - this.config.stopLossPercentage / 100) 
-      : price * (1 + this.config.stopLossPercentage / 100);
-    
-    const stopLossResponse = await this.client.setTpsl(
-      symbol,
-      positionSide,
-      'loss_plan',
-      stopPrice.toFixed(5),
-      formattedSize
-    );
-    
-    if (stopLossResponse && stopLossResponse.code === '00000') {
-      logger.info(`Установлен стоп-лосс для ${symbol} на уровне ${stopPrice.toFixed(5)}`);
-    } else {
-      logger.warn(`Не удалось установить стоп-лосс: ${stopLossResponse ? stopLossResponse.msg : 'Нет ответа от API'}`);
-    }
-  }
-  
-  // Устанавливаем тейк-профит
-  if (this.config.takeProfitPercentage > 0) {
-    const takeProfitPrice = type === 'LONG' 
-      ? price * (1 + this.config.takeProfitPercentage / 100) 
-      : price * (1 - this.config.takeProfitPercentage / 100);
-    
-    const takeProfitResponse = await this.client.setTpsl(
-      symbol,
-      positionSide,
-      'profit_plan',
-      takeProfitPrice.toFixed(5),
-      formattedSize
-    );
-    
-    if (takeProfitResponse && takeProfitResponse.code === '00000') {
-      logger.info(`Установлен тейк-профит для ${symbol} на уровне ${takeProfitPrice.toFixed(5)}`);
-    } else {
-      logger.warn(`Не удалось установить тейк-профит: ${takeProfitResponse ? takeProfitResponse.msg : 'Нет ответа от API'}`);
-    }
-  }
-} catch (tpslError) {
-  logger.warn(`Ошибка при установке TP/SL: ${tpslError.message}`);
-
+        // Добавляем задержку перед установкой TP/SL
+        // для того, чтобы биржа успела обработать открытие позиции
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Получаем актуальные позиции с биржи
+        const positionsResponse = await this.client.getPositions(symbol);
+        let foundPosition = null;
+        
+        if (positionsResponse && positionsResponse.data && Array.isArray(positionsResponse.data)) {
+          // Ищем нашу позицию по символу и стороне
+          foundPosition = positionsResponse.data.find(pos => 
+            pos.symbol === symbol && 
+            pos.holdSide.toUpperCase() === type
+          );
+        }
+        
+        if (!foundPosition) {
+          logger.warn(`Не удалось найти открытую позицию ${type} ${symbol} для установки TP/SL`);
+          return newPosition;
+        }
+        
+        // Правильно определяем positionSide для API
+        const positionSide = type.toLowerCase(); // Должно быть "long" или "short"
+        
+        // Устанавливаем стоп-лосс
+        if (this.config.stopLossPercentage > 0) {
+          const stopPrice = type === 'LONG' 
+            ? price * (1 - this.config.stopLossPercentage / 100) 
+            : price * (1 + this.config.stopLossPercentage / 100);
+          
+          const stopLossResponse = await this.client.setTpsl(
+            symbol,
+            positionSide,
+            'loss_plan',
+            stopPrice,
+            formattedSize
+          );
+          
+          if (stopLossResponse && stopLossResponse.code === '00000') {
+            logger.info(`Установлен стоп-лосс для ${symbol} на уровне ${stopPrice.toFixed(5)}`);
+          } else {
+            logger.warn(`Не удалось установить стоп-лосс: ${stopLossResponse ? stopLossResponse.msg : 'Нет ответа от API'}`);
+          }
+        }
+        
+        // Устанавливаем тейк-профит
+        if (this.config.takeProfitPercentage > 0) {
+          const takeProfitPrice = type === 'LONG' 
+            ? price * (1 + this.config.takeProfitPercentage / 100) 
+            : price * (1 - this.config.takeProfitPercentage / 100);
+          
+          const takeProfitResponse = await this.client.setTpsl(
+            symbol,
+            positionSide,
+            'profit_plan',
+            takeProfitPrice,
+            formattedSize
+          );
+          
+          if (takeProfitResponse && takeProfitResponse.code === '00000') {
+            logger.info(`Установлен тейк-профит для ${symbol} на уровне ${takeProfitPrice.toFixed(5)}`);
+          } else {
+            logger.warn(`Не удалось установить тейк-профит: ${takeProfitResponse ? takeProfitResponse.msg : 'Нет ответа от API'}`);
+          }
+        }
+      } catch (tpslError) {
+        logger.warn(`Ошибка при установке TP/SL: ${tpslError.message}`);
       }
       
       // Добавляем позицию в список открытых
@@ -277,7 +276,7 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  async closePosition(positionId, percentage) {
+  async closePosition(positionId, percentage = 100) {
     try {
       percentage = percentage || 100;
       
@@ -303,24 +302,53 @@ class PositionManager extends EventEmitter {
             logger.info(`Активная позиция: ${pos.symbol} ${pos.holdSide}, ID: ${pos.positionId}, размер: ${pos.total}`);
             
             // Определяем сторону ордера (противоположную типу позиции)
-            const side = pos.holdSide.toLowerCase() === 'long' ? 'sell' : 'buy';
+            const closeSide = pos.holdSide.toLowerCase() === 'long' ? 'sell' : 'buy';
             
             // Закрываем позицию через API
             try {
-              const orderResponse = await this.client.placeOrder(
-                pos.symbol,
-                side,
-                'market',
-                pos.total,
-                null,
-                true,
-                'close'
-              );
+              logger.info(`Закрытие позиции ${pos.symbol} ${pos.holdSide} через API`);
+              // Получаем текущую цену для символа
+              const ticker = await this.client.getTicker(pos.symbol);
+              const currentPrice = ticker && ticker.data && ticker.data.last ? 
+                parseFloat(ticker.data.last) : parseFloat(pos.marketPrice);
               
-              if (orderResponse && orderResponse.data && orderResponse.code === '00000') {
+              // Получаем информацию о символе для правильного форматирования цены
+              const symbolInfo = await this.client.getSymbolInfo(pos.symbol);
+              
+              logger.info(`Закрытие позиции ${pos.symbol} ${pos.holdSide} через лимитный ордер, сторона: ${closeSide}, размер: ${pos.total}, цена: ${currentPrice}`);
+              
+              // Параметры для закрытия позиции через лимитный ордер
+              const params = {
+                symbol: pos.symbol,
+                marginCoin: "USDT",
+                marginMode: "isolated",
+                size: pos.total,
+                side: closeSide,
+                orderType: "market", // Используем market для гарантированного закрытия
+                price: null, // Для market ордера цена не нужна
+                tradeSide: "close",
+                productType: "USDT-FUTURES",
+                reduceOnly: "YES"
+              };
+              
+              logger.info(`Параметры для закрытия позиции: ${JSON.stringify(params)}`);
+              
+              const orderResponse = await this.client.submitOrder(params);
+              
+              if (orderResponse && orderResponse.code === '00000') {
                 logger.info(`Позиция ${pos.symbol} ${pos.holdSide} успешно закрыта`);
+                
+                // Обновляем историю
+                this.updatePositionHistory({
+                  id: pos.positionId,
+                  symbol: pos.symbol,
+                  type: pos.holdSide.toUpperCase(),
+                  entryPrice: parseFloat(pos.openPrice),
+                  size: parseFloat(pos.total),
+                  currentPrice: currentPrice
+                }, 'closed', currentPrice);
               } else {
-                logger.warn(`Не удалось закрыть позицию ${pos.symbol} ${pos.holdSide}`);
+                logger.warn(`Не удалось закрыть позицию ${pos.symbol} ${pos.holdSide}: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
               }
             } catch (closeError) {
               logger.error(`Ошибка при закрытии позиции ${pos.symbol} ${pos.holdSide}: ${closeError.message}`);
@@ -332,7 +360,7 @@ class PositionManager extends EventEmitter {
       }
       
       // Определяем сторону ордера на основе типа позиции (противоположную)
-      const side = position.type === 'LONG' ? 'sell' : 'buy';
+      const closeSide = position.type === 'LONG' ? 'sell' : 'buy';
       
       // Определяем размер закрытия
       let closeSize = (position.size * percentage) / 100;
@@ -340,79 +368,118 @@ class PositionManager extends EventEmitter {
       
       logger.info(`Закрытие позиции ${positionId}: ${position.symbol} ${position.type}, размер=${closeSize}`);
       
-      // Закрываем позицию через API
-      const orderResponse = await this.client.placeOrder(
-        position.symbol,
-        side,
-        'market',
-        closeSize.toString(),
-        null,
-        true,
-        'close'
-      );
+      // Получаем текущую цену для символа
+      const ticker = await this.client.getTicker(position.symbol);
+      const currentPrice = ticker && ticker.data && ticker.data.last ? 
+        parseFloat(ticker.data.last) : position.currentPrice;
       
-      if (!orderResponse || !orderResponse.data || orderResponse.code !== '00000') {
-        logger.error(`Ошибка при закрытии позиции: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
-        // Пробуем альтернативный метод закрытия
+      // Получаем информацию о символе
+      const symbolInfo = await this.client.getSymbolInfo(position.symbol);
+      
+      // Для закрытия позиций используем market ордер (более надежно)
+      try {
+        logger.info(`Закрытие позиции через market ордер: ${closeSide} ${position.symbol}, размер=${closeSize}`);
+        
+        const orderResponse = await this.client.placeOrder(
+          position.symbol,
+          closeSide,
+          'market',  // Используем market для гарантированного закрытия
+          closeSize.toString(),
+          null,  // Для market ордера цена не нужна
+          true,  // reduceOnly = true
+          'close' // tradeSide = close
+        );
+        
+        if (!orderResponse || !orderResponse.data || orderResponse.code !== '00000') {
+          logger.error(`Ошибка при закрытии позиции через market ордер: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
+          
+          // Пробуем альтернативный метод с явным указанием всех параметров
+          logger.info(`Пробуем альтернативный метод закрытия позиции...`);
+          
+          // Параметры для закрытия позиции
+          const closeParams = {
+            symbol: position.symbol,
+            marginCoin: "USDT",
+            marginMode: "isolated",
+            size: closeSize.toString(),
+            side: closeSide,
+            orderType: "market",
+            tradeSide: "close",
+            productType: "USDT-FUTURES",
+            reduceOnly: "YES"
+          };
+          
+          logger.info(`Параметры для закрытия позиции: ${JSON.stringify(closeParams)}`);
+          
+          const alternativeResponse = await this.client.submitOrder(closeParams);
+          
+          if (!alternativeResponse || alternativeResponse.code !== '00000') {
+            logger.error(`Не удалось закрыть позицию альтернативным методом: ${alternativeResponse ? alternativeResponse.msg : 'Нет ответа от API'}`);
+            return false;
+          }
+          
+          logger.info(`Позиция ${positionId} успешно закрыта альтернативным методом`);
+        } else {
+          logger.info(`Позиция ${positionId} успешно закрыта (${percentage}%)`);
+        }
+        
+        // Обновляем историю позиции
+        this.updatePositionHistory(position, 'closed', currentPrice);
+        
+        // При частичном закрытии обновляем размер позиции
+        if (percentage < 100) {
+          const updatedPosition = this.openPositions.find(p => p.id === positionId);
+          if (updatedPosition) {
+            updatedPosition.size = position.size - closeSize;
+          }
+        } else {
+          // При полном закрытии удаляем позицию из списка открытых
+          this.openPositions = this.openPositions.filter(p => p.id !== positionId);
+        }
+        
+        this.emit('position_closed', { 
+          positionId: positionId, 
+          percentage: percentage
+        });
+        
+        return true;
+      } catch (error) {
+        logger.error(`Ошибка при закрытии позиции через market ордер: ${error.message}`);
+        
+        // Пробуем закрыть позицию через API для закрытия всей позиции
         try {
-          const alternativeResponse = await this.client.request('POST', '/api/v2/mix/order/close-position', {}, {
+          logger.info(`Пробуем закрыть всю позицию через API endpoint для закрытия...`);
+          
+          const closePositionResponse = await this.client.request('POST', '/api/v2/mix/position/close-position', {}, {
             symbol: position.symbol,
             marginCoin: 'USDT',
             productType: "USDT-FUTURES"
           });
           
-          if (alternativeResponse && alternativeResponse.code === '00000') {
-            logger.info(`Позиция ${positionId} успешно закрыта альтернативным методом`);
+          if (closePositionResponse && closePositionResponse.code === '00000') {
+            logger.info(`Позиция ${positionId} успешно закрыта через endpoint close-position`);
             
             // Обновляем историю позиции
-            this.updatePositionHistory(position, 'closed', position.currentPrice);
+            this.updatePositionHistory(position, 'closed', currentPrice);
             
             // Удаляем позицию из списка открытых
             this.openPositions = this.openPositions.filter(p => p.id !== positionId);
             
-            // Отправляем событие закрытия
             this.emit('position_closed', { 
               positionId: positionId, 
-              percentage: percentage
+              percentage: 100
             });
             
             return true;
-          } else {
-            logger.error(`Не удалось закрыть позицию альтернативным методом: ${alternativeResponse ? alternativeResponse.msg : 'Нет ответа'}`);
-            return false;
           }
-        } catch (alternativeError) {
-          logger.error(`Ошибка при альтернативном закрытии позиции: ${alternativeError.message}`);
+          
+          logger.error(`Не удалось закрыть позицию через endpoint close-position: ${closePositionResponse ? closePositionResponse.msg : 'Нет ответа от API'}`);
+          return false;
+        } catch (closePositionError) {
+          logger.error(`Ошибка при закрытии позиции через endpoint close-position: ${closePositionError.message}`);
           return false;
         }
       }
-      
-      logger.info(`Позиция ${positionId} успешно закрыта (${percentage}%)`);
-      
-      // Получаем текущую цену для расчета PnL
-      const ticker = await this.client.getTicker(position.symbol);
-      const closePrice = ticker && ticker.data && ticker.data.last ? parseFloat(ticker.data.last) : position.entryPrice;
-      
-      // Обновляем историю позиции
-      this.updatePositionHistory(position, 'closed', closePrice);
-      
-      // При частичном закрытии обновляем размер позиции
-      if (percentage < 100) {
-        const updatedPosition = this.openPositions.find(p => p.id === positionId);
-        if (updatedPosition) {
-          updatedPosition.size = position.size - closeSize;
-        }
-      } else {
-        // При полном закрытии удаляем позицию из списка открытых
-        this.openPositions = this.openPositions.filter(p => p.id !== positionId);
-      }
-      
-      this.emit('position_closed', { 
-        positionId: positionId, 
-        percentage: percentage
-      });
-      
-      return true;
     } catch (error) {
       logger.error('Ошибка при закрытии позиции: ' + error.message);
       return false;
