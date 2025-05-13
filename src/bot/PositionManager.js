@@ -276,276 +276,125 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  async closePosition(positionId, percentage = 100) {
-    try {
-      percentage = percentage || 100;
+// Метод для закрытия позиции по символу
+async closePositionBySymbol(symbol) {
+  try {
+    if (!symbol) {
+      logger.warn('Не указан символ для закрытия позиции');
+      return false;
+    }
+    
+    // Обновляем список позиций для получения актуальных данных
+    await this.updateOpenPositions();
+    
+    // Находим все позиции с указанным символом
+    const positionsToClose = this.openPositions.filter(p => p.symbol === symbol);
+    
+    if (positionsToClose.length === 0) {
+      logger.warn(`Не найдены открытые позиции для символа ${symbol}`);
       
-      // Найдем позицию в списке открытых
-      const positions = await this.updateOpenPositions();
-      const position = positions.find(p => p.id === positionId);
-      
-      if (!position) {
-        logger.warn(`Позиция с ID ${positionId} не найдена в списке открытых позиций`);
+      // Попробуем получить позиции непосредственно с API
+      try {
+        const allPositionsResponse = await this.client.getPositions(symbol);
         
-        // Попробуем найти все позиции для символа, чтобы закрыть все активные
-        const allPositions = await this.client.getPositions();
-        
-        if (!allPositions || !allPositions.data || !allPositions.data.length) {
-          logger.warn('Не удалось получить список позиций от API');
+        if (!allPositionsResponse || !allPositionsResponse.data || !allPositionsResponse.data.length) {
+          logger.warn(`Не найдены позиции на бирже для символа ${symbol}`);
           return false;
         }
         
-        // Логируем все найденные позиции для отладки
-        logger.info(`Найдено ${allPositions.data.length} позиций на бирже`);
-        for (const pos of allPositions.data) {
-          if (parseFloat(pos.total) > 0) {
-            logger.info(`Активная позиция: ${pos.symbol} ${pos.holdSide}, ID: ${pos.positionId}, размер: ${pos.total}`);
-            
-            // Пытаемся закрыть позицию через прямой метод API
-            try {
-              logger.info(`Закрытие позиции ${pos.symbol} через прямой метод closePosition`);
-              
-              const closeResponse = await this.client.closePosition(pos.symbol);
-              
-              if (closeResponse && closeResponse.code === '00000') {
-                logger.info(`Позиция ${pos.symbol} ${pos.holdSide} успешно закрыта через метод closePosition`);
-                
-                // Получаем текущую цену для символа
-                const ticker = await this.client.getTicker(pos.symbol);
-                const currentPrice = ticker && ticker.data && ticker.data.last ? 
-                  parseFloat(ticker.data.last) : parseFloat(pos.marketPrice);
-                
-                // Обновляем историю
-                this.updatePositionHistory({
-                  id: pos.positionId,
-                  symbol: pos.symbol,
-                  type: pos.holdSide.toUpperCase(),
-                  entryPrice: parseFloat(pos.openPrice),
-                  size: parseFloat(pos.total),
-                  currentPrice: currentPrice
-                }, 'closed', currentPrice);
-              } else {
-                logger.warn(`Не удалось закрыть позицию ${pos.symbol} ${pos.holdSide} через метод closePosition: ${closeResponse ? closeResponse.msg : 'Нет ответа от API'}`);
-                
-                // Определяем сторону ордера (противоположную типу позиции)
-                const closeSide = pos.holdSide.toLowerCase() === 'long' ? 'sell' : 'buy';
-                
-                // Закрываем позицию через market ордер
-                logger.info(`Закрытие позиции ${pos.symbol} ${pos.holdSide} через market ордер, сторона: ${closeSide}, размер: ${pos.total}`);
-                
-                // Параметры для закрытия позиции через market ордер
-                const params = {
-                  symbol: pos.symbol,
-                  marginCoin: "USDT",
-                  marginMode: "isolated",
-                  size: pos.total,
-                  side: closeSide,
-                  orderType: "market", // Используем market для гарантированного закрытия
-                  tradeSide: "close",
-                  productType: "USDT-FUTURES",
-                  reduceOnly: "YES"
-                };
-                
-                logger.info(`Параметры для закрытия позиции: ${JSON.stringify(params)}`);
-                
-                const orderResponse = await this.client.submitOrder(params);
-                
-                if (orderResponse && orderResponse.code === '00000') {
-                  logger.info(`Позиция ${pos.symbol} ${pos.holdSide} успешно закрыта через market ордер`);
-                  
-                  // Получаем текущую цену для символа
-                  const ticker = await this.client.getTicker(pos.symbol);
-                  const currentPrice = ticker && ticker.data && ticker.data.last ? 
-                    parseFloat(ticker.data.last) : parseFloat(pos.marketPrice);
-                  
-                  // Обновляем историю
-                  this.updatePositionHistory({
-                    id: pos.positionId,
-                    symbol: pos.symbol,
-                    type: pos.holdSide.toUpperCase(),
-                    entryPrice: parseFloat(pos.openPrice),
-                    size: parseFloat(pos.total),
-                    currentPrice: currentPrice
-                  }, 'closed', currentPrice);
-                } else {
-                  logger.warn(`Не удалось закрыть позицию ${pos.symbol} ${pos.holdSide} через market ордер: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
-                }
-              }
-            } catch (closeError) {
-              logger.error(`Ошибка при закрытии позиции ${pos.symbol} ${pos.holdSide}: ${closeError.message}`);
-            }
-          }
-        }
-        
-        return true;
-      }
-      
-      // Если нашли позицию, сначала пробуем закрыть ее через прямой метод closePosition
-      try {
-        logger.info(`Закрытие позиции ${position.symbol} через прямой метод closePosition`);
-        
-        const directCloseResponse = await this.client.closePosition(position.symbol);
-        
-        if (directCloseResponse && directCloseResponse.code === '00000') {
-          logger.info(`Позиция ${position.symbol} успешно закрыта через метод closePosition`);
-          
-          // Получаем текущую цену для символа
-          const ticker = await this.client.getTicker(position.symbol);
-          const currentPrice = ticker && ticker.data && ticker.data.last ? 
-            parseFloat(ticker.data.last) : position.currentPrice;
-          
-          // Обновляем историю позиции
-          this.updatePositionHistory(position, 'closed', currentPrice);
-          
-          // Удаляем позицию из списка открытых
-          this.openPositions = this.openPositions.filter(p => p.id !== positionId);
-          
-          this.emit('position_closed', { 
-            positionId: positionId, 
-            percentage: 100
-          });
-          
-          return true;
-        } else {
-          logger.warn(`Не удалось закрыть позицию через метод closePosition: ${directCloseResponse ? directCloseResponse.msg : 'Нет ответа от API'}`);
-        }
-      } catch (directCloseError) {
-        logger.warn(`Ошибка при закрытии позиции через метод closePosition: ${directCloseError.message}`);
-      }
-      
-      // Если метод closePosition не сработал, пробуем через market ордер
-      
-      // Определяем сторону ордера на основе типа позиции (противоположную)
-      const closeSide = position.type === 'LONG' ? 'sell' : 'buy';
-      
-      // Определяем размер закрытия
-      let closeSize = (position.size * percentage) / 100;
-      closeSize = parseFloat(closeSize.toFixed(5));
-      
-      logger.info(`Закрытие позиции ${positionId}: ${position.symbol} ${position.type}, размер=${closeSize}`);
-      
-      // Получаем текущую цену для символа
-      const ticker = await this.client.getTicker(position.symbol);
-      const currentPrice = ticker && ticker.data && ticker.data.last ? 
-        parseFloat(ticker.data.last) : position.currentPrice;
-      
-      // Для закрытия позиций используем market ордер (более надежно)
-      try {
-        logger.info(`Закрытие позиции через market ордер: ${closeSide} ${position.symbol}, размер=${closeSize}`);
-        
-        const orderResponse = await this.client.placeOrder(
-          position.symbol,
-          closeSide,
-          'market',  // Используем market для гарантированного закрытия
-          closeSize.toString(),
-          null,  // Для market ордера цена не нужна
-          true,  // reduceOnly = true
-          'close' // tradeSide = close
+        // Находим активные позиции с нужным символом
+        const apiPositions = allPositionsResponse.data.filter(
+          pos => pos.symbol === symbol && parseFloat(pos.total) > 0
         );
         
-        if (!orderResponse || !orderResponse.data || orderResponse.code !== '00000') {
-          logger.error(`Ошибка при закрытии позиции через market ордер: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
+        if (apiPositions.length === 0) {
+          logger.warn(`Нет активных позиций на бирже для символа ${symbol}`);
+          return false;
+        }
+        
+        // Закрываем каждую найденную позицию через API
+        let allClosed = true;
+        
+        for (const pos of apiPositions) {
+          logger.info(`Закрытие позиции ${pos.symbol} ${pos.holdSide} через API`);
           
-          // Пробуем альтернативный метод с явным указанием всех параметров
-          logger.info(`Пробуем альтернативный метод закрытия позиции...`);
+          // Определяем сторону ордера (противоположную типу позиции)
+          const closeSide = pos.holdSide.toLowerCase() === 'long' ? 'sell' : 'buy';
           
-          // Параметры для закрытия позиции
-          const closeParams = {
-            symbol: position.symbol,
+          // Получаем текущую цену для символа
+          const ticker = await this.client.getTicker(pos.symbol);
+          const currentPrice = ticker && ticker.data && ticker.data.last ? 
+            parseFloat(ticker.data.last) : parseFloat(pos.marketPrice);
+          
+          // Параметры для закрытия позиции через market ордер
+          const params = {
+            symbol: pos.symbol,
             marginCoin: "USDT",
             marginMode: "isolated",
-            size: closeSize.toString(),
+            size: pos.total,
             side: closeSide,
-            orderType: "market",
+            orderType: "market", // Используем market для гарантированного закрытия
             tradeSide: "close",
             productType: "USDT-FUTURES",
             reduceOnly: "YES"
           };
           
-          logger.info(`Параметры для закрытия позиции: ${JSON.stringify(closeParams)}`);
+          logger.info(`Параметры для закрытия позиции: ${JSON.stringify(params)}`);
           
-          const alternativeResponse = await this.client.submitOrder(closeParams);
-          
-          if (!alternativeResponse || alternativeResponse.code !== '00000') {
-            logger.error(`Не удалось закрыть позицию альтернативным методом: ${alternativeResponse ? alternativeResponse.msg : 'Нет ответа от API'}`);
-            return false;
+          try {
+            const orderResponse = await this.client.submitOrder(params);
+            
+            if (orderResponse && orderResponse.code === '00000') {
+              logger.info(`Позиция ${pos.symbol} ${pos.holdSide} успешно закрыта`);
+              
+              // Обновляем историю
+              this.updatePositionHistory({
+                id: pos.positionId,
+                symbol: pos.symbol,
+                type: pos.holdSide.toUpperCase(),
+                entryPrice: parseFloat(pos.openPrice),
+                size: parseFloat(pos.total),
+                currentPrice: currentPrice
+              }, 'closed', currentPrice);
+            } else {
+              logger.warn(`Не удалось закрыть позицию ${pos.symbol} ${pos.holdSide}: ${orderResponse ? orderResponse.msg : 'Нет ответа от API'}`);
+              allClosed = false;
+            }
+          } catch (closeError) {
+            logger.error(`Ошибка при закрытии позиции ${pos.symbol} ${pos.holdSide}: ${closeError.message}`);
+            allClosed = false;
           }
-          
-          logger.info(`Позиция ${positionId} успешно закрыта альтернативным методом`);
-        } else {
-          logger.info(`Позиция ${positionId} успешно закрыта (${percentage}%)`);
         }
         
-        // Обновляем историю позиции
-        this.updatePositionHistory(position, 'closed', currentPrice);
-        
-        // При частичном закрытии обновляем размер позиции
-        if (percentage < 100) {
-          const updatedPosition = this.openPositions.find(p => p.id === positionId);
-          if (updatedPosition) {
-            updatedPosition.size = position.size - closeSize;
-          }
-        } else {
-          // При полном закрытии удаляем позицию из списка открытых
-          this.openPositions = this.openPositions.filter(p => p.id !== positionId);
-        }
-        
-        this.emit('position_closed', { 
-          positionId: positionId, 
-          percentage: percentage
-        });
-        
-        return true;
-      } catch (error) {
-        logger.error(`Ошибка при закрытии позиции через market ордер: ${error.message}`);
-        
-        // Последняя попытка через API endpoint для закрытия всей позиции
-        try {
-          logger.info(`Пробуем последний способ закрытия через API endpoint...`);
-          
-          const closePositionResponse = await this.client.request('POST', '/api/v2/mix/position/close-position', {}, {
-            symbol: position.symbol,
-            marginCoin: 'USDT',
-            productType: "USDT-FUTURES"
-          });
-          
-          if (closePositionResponse && closePositionResponse.code === '00000') {
-            logger.info(`Позиция ${positionId} успешно закрыта через endpoint close-position`);
-            
-            // Обновляем историю позиции
-            this.updatePositionHistory(position, 'closed', currentPrice);
-            
-            // Удаляем позицию из списка открытых
-            this.openPositions = this.openPositions.filter(p => p.id !== positionId);
-            
-            this.emit('position_closed', { 
-              positionId: positionId, 
-              percentage: 100
-            });
-            
-            return true;
-          }
-          
-          logger.error(`Не удалось закрыть позицию через endpoint close-position: ${closePositionResponse ? closePositionResponse.msg : 'Нет ответа от API'}`);
-          return false;
-        } catch (closePositionError) {
-          logger.error(`Ошибка при закрытии позиции через endpoint close-position: ${closePositionError.message}`);
-          return false;
-        }
+        return allClosed;
+      } catch (apiError) {
+        logger.error(`Ошибка при получении позиций с API: ${apiError.message}`);
+        return false;
       }
-    } catch (error) {
-      logger.error('Ошибка при закрытии позиции: ' + error.message);
-      return false;
     }
+    
+    // Если позиции найдены в локальном списке, закрываем их
+    let allClosed = true;
+    
+    for (const position of positionsToClose) {
+      logger.info(`Закрытие позиции: ${position.symbol} (ID: ${position.id})`);
+      const result = await this.closePosition(position.id);
+      
+      if (!result) {
+        allClosed = false;
+        logger.warn(`Не удалось закрыть позицию ${position.id} для символа ${symbol}`);
+      }
+    }
+    
+    // Обновляем список открытых позиций после закрытия
+    await this.updateOpenPositions();
+    
+    return allClosed;
+  } catch (error) {
+    logger.error(`Ошибка при закрытии позиций для символа ${symbol}: ${error.message}`);
+    return false;
   }
-
-  getOpenPositions() {
-    return this.openPositions;
-  }
-
-  getPositionHistory() {
-    return this.positionHistory;
-  }
+}
 
   updatePositionHistory(position, status, closePrice) {
     try {

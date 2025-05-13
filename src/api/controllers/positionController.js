@@ -178,9 +178,9 @@ exports.closePosition = async function(req, res) {
       
       // Если указан symbol, но позиция не найдена по symbol, пробуем закрыть все позиции по этому символу через API
       if (symbol) {
-        logger.info(`Попытка закрытия всех позиций для символа ${symbol} через API`);
+        logger.info(`Закрытие позиции по символу ${symbol} через прямой метод closePositionBySymbol`);
         
-        // Закрываем позицию напрямую через API
+        // Закрываем позицию напрямую через метод closePositionBySymbol
         const result = await tradingBot.positionManager.closePositionBySymbol(symbol);
         
         if (!result) {
@@ -205,7 +205,7 @@ exports.closePosition = async function(req, res) {
       }
     }
     
-    // Закрываем позицию по ID
+    // Закрываем позицию по ID (через стандартный метод)
     const result = await tradingBot.positionManager.closePosition(positionId, 100);
     
     if (!result) {

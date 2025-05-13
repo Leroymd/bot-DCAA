@@ -545,95 +545,95 @@ class TradingBot extends EventEmitter {
   }
 
   updateStatus() {
-    const now = new Date().getTime();
-    
-    if (this.status.status === 'running') {
-      this.status.uptime = now - this.status.startTime;
-    }
-    
-    if (this.dailyPerformance && this.dailyPerformance.startBalance > 0) {
-      this.status.todayProfit = this.balance - this.dailyPerformance.startBalance;
-      this.status.todayProfitPercentage = (this.status.todayProfit / this.dailyPerformance.startBalance) * 100;
-    }
-    
-    if (this.initialBalance > 0) {
-      this.status.totalProfit = this.balance - this.initialBalance;
-      this.status.profitPercentage = (this.status.totalProfit / this.initialBalance) * 100;
-    }
-    
-    this.status.withdrawn = this.reinvestmentInfo.totalWithdrawn;
-    
-    // Используем только реальные данные из позиций
-    const positionHistory = this.positionManager.getPositionHistory();
-    const totalTrades = positionHistory.length;
-    const winTrades = positionHistory.filter(trade => trade.result === 'win').length;
-    
-    this.status.totalTrades = totalTrades;
-    this.status.winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
-    
-    if (totalTrades > 0) {
-      const profits = positionHistory.map(trade => trade.pnl || 0);
-      const avgProfit = profits.reduce((sum, pnl) => sum + pnl, 0) / totalTrades;
-      this.status.avgProfit = avgProfit;
-    } else {
-      this.status.avgProfit = 0;
-    }
-    
-    this.status.balance = this.balance;
-    
-    // Получаем активные позиции прямо с биржи
-    if (this.client) {
-      this.positionManager.updateOpenPositions().then(positions => {
-        // Обновляем торговые пары на основе реальных позиций
-        const tradingPairs = [];
+  const now = new Date().getTime();
+  
+  if (this.status.status === 'running') {
+    this.status.uptime = now - this.status.startTime;
+  }
+  
+  if (this.dailyPerformance && this.dailyPerformance.startBalance > 0) {
+    this.status.todayProfit = this.balance - this.dailyPerformance.startBalance;
+    this.status.todayProfitPercentage = (this.status.todayProfit / this.dailyPerformance.startBalance) * 100;
+  }
+  
+  if (this.initialBalance > 0) {
+    this.status.totalProfit = this.balance - this.initialBalance;
+    this.status.profitPercentage = (this.status.totalProfit / this.initialBalance) * 100;
+  }
+  
+  this.status.withdrawn = this.reinvestmentInfo.totalWithdrawn;
+  
+  // Используем безопасный способ получения истории позиций
+  const positionHistory = this.positionManager.positionHistory || [];
+  const totalTrades = positionHistory.length;
+  const winTrades = positionHistory.filter(trade => trade.result === 'win').length;
+  
+  this.status.totalTrades = totalTrades;
+  this.status.winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
+  
+  if (totalTrades > 0) {
+    const profits = positionHistory.map(trade => trade.pnl || 0);
+    const avgProfit = profits.reduce((sum, pnl) => sum + pnl, 0) / totalTrades;
+    this.status.avgProfit = avgProfit;
+  } else {
+    this.status.avgProfit = 0;
+  }
+  
+  this.status.balance = this.balance;
+  
+  // Получаем активные позиции прямо с биржи
+  if (this.client) {
+    this.positionManager.updateOpenPositions().then(positions => {
+      // Обновляем торговые пары на основе реальных позиций
+      const tradingPairs = [];
+      
+      // Добавляем активные позиции
+      for (const position of positions) {
+        const timeString = this.formatDuration(now - position.entryTime);
         
-        // Добавляем активные позиции
-        for (const position of positions) {
-          const timeString = this.formatDuration(now - position.entryTime);
-          
+        tradingPairs.push({
+          pair: position.symbol,
+          status: 'active',
+          position: position.type,
+          entryPrice: position.entryPrice,
+          currentPrice: position.currentPrice || this.currentPrice[position.symbol] || 0,
+          profit: position.pnlPercentage || 0,
+          time: timeString,
+          id: position.id
+        });
+      }
+      
+      // Добавляем остальные торговые пары без позиций
+      for (const symbol of this.config.tradingPairs) {
+        if (!tradingPairs.find(p => p.pair === symbol)) {
           tradingPairs.push({
-            pair: position.symbol,
-            status: 'active',
-            position: position.type,
-            entryPrice: position.entryPrice,
-            currentPrice: position.currentPrice || this.currentPrice[position.symbol] || 0,
-            profit: position.pnlPercentage || 0,
-            time: timeString,
-            id: position.id
+            pair: symbol,
+            status: 'waiting',
+            position: null,
+            profit: 0,
+            time: '00:00',
+            signals: this.indicatorManager.getSignalCount(symbol) || 0
           });
         }
-        
-        // Добавляем остальные торговые пары без позиций
-        for (const symbol of this.config.tradingPairs) {
-          if (!tradingPairs.find(p => p.pair === symbol)) {
-            tradingPairs.push({
-              pair: symbol,
-              status: 'waiting',
-              position: null,
-              profit: 0,
-              time: '00:00',
-              signals: this.indicatorManager.getSignalCount(symbol) || 0
-            });
-          }
-        }
-        
-        dataStore.set('tradingPairs', tradingPairs);
-      }).catch(error => {
-        logger.error('Ошибка при обновлении позиций: ' + error.message);
-      });
-    }
-    
-    // Получаем реальные сигналы
-    const recentSignals = this.strategy.getRecentSignals();
-    dataStore.set('recentSignals', recentSignals);
-    
-    // Обновляем статус бота
-    dataStore.set('botStatus', this.status);
-    
-    this.emit('update', this.status);
-    
-    return this.status;
+      }
+      
+      dataStore.set('tradingPairs', tradingPairs);
+    }).catch(error => {
+      logger.error('Ошибка при обновлении позиций: ' + error.message);
+    });
   }
+  
+  // Получаем реальные сигналы
+  const recentSignals = this.strategy.getRecentSignals();
+  dataStore.set('recentSignals', recentSignals);
+  
+  // Обновляем статус бота
+  dataStore.set('botStatus', this.status);
+  
+  this.emit('update', this.status);
+  
+  return this.status;
+}
 
   async checkProfitWithdrawal() {
     try {

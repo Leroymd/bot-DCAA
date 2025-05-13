@@ -1,4 +1,5 @@
-// src/api/controllers/botController.js
+// src/api/controllers/botController.js (исправленная версия)
+
 const logger = require('../../utils/logger');
 const dataStore = require('../../utils/dataStore');
 let tradingBot = null;
@@ -6,7 +7,6 @@ let tradingBot = null;
 exports.setBotInstance = function(botInstance) {
   tradingBot = botInstance;
 };
-// Исправление в src/api/controllers/botController.js
 
 exports.getStatus = function(req, res) {
   try {
@@ -33,6 +33,7 @@ exports.getStatus = function(req, res) {
     });
   }
 };
+
 exports.startBot = function(req, res) {
   if (!tradingBot) {
     return res.status(500).json({
