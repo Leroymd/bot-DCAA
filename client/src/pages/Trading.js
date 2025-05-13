@@ -1,5 +1,4 @@
-// Полный файл client/src/pages/Trading.js с исправленной функцией closePosition
-
+// client/src/pages/Trading.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AlertCircle, ArrowUp, ArrowDown, X } from 'lucide-react';

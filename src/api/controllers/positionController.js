@@ -1,4 +1,4 @@
-// src/api/controllers/positionController.js с поддержкой закрытия по символу
+// src/api/controllers/positionController.js
 const logger = require('../../utils/logger');
 const { getBot } = require('../../bot/setup');
 
@@ -153,65 +153,23 @@ exports.closePosition = async function(req, res) {
       });
     }
     
-    // Получаем текущие открытые позиции для проверки
-    const openPositions = await tradingBot.positionManager.updateOpenPositions();
-    logger.info(`Текущие открытые позиции: ${JSON.stringify(openPositions.map(p => ({ id: p.id, symbol: p.symbol })))}`);
+    let result = false;
     
-    let targetPosition;
-    
+    // Если указан positionId, закрываем по ID
     if (positionId) {
-      // Пытаемся найти позицию по ID
-      targetPosition = openPositions.find(p => String(p.id) === String(positionId));
-      logger.info(`Поиск позиции по ID ${positionId}: ${targetPosition ? 'найдена' : 'не найдена'}`);
-    } else if (symbol) {
-      // Пытаемся найти позицию по символу
-      targetPosition = openPositions.find(p => p.symbol === symbol);
-      logger.info(`Поиск позиции по символу ${symbol}: ${targetPosition ? 'найдена' : 'не найдена'}`);
-      
-      if (targetPosition) {
-        positionId = targetPosition.id;
-      }
+      logger.info(`Закрытие позиции по ID: ${positionId}`);
+      result = await tradingBot.positionManager.closePosition(positionId, 100);
+    } 
+    // Если указан symbol, закрываем по символу
+    else if (symbol) {
+      logger.info(`Закрытие позиции по символу: ${symbol}`);
+      result = await tradingBot.positionManager.closePositionBySymbol(symbol);
     }
-    
-    if (!targetPosition) {
-      logger.warn(`Позиция с ${positionId ? 'ID ' + positionId : 'символом ' + symbol} не найдена в списке открытых позиций`);
-      
-      // Если указан symbol, но позиция не найдена по symbol, пробуем закрыть все позиции по этому символу через API
-      if (symbol) {
-        logger.info(`Закрытие позиции по символу ${symbol} через прямой метод closePositionBySymbol`);
-        
-        // Закрываем позицию напрямую через метод closePositionBySymbol
-        const result = await tradingBot.positionManager.closePositionBySymbol(symbol);
-        
-        if (!result) {
-          return res.status(500).json({
-            success: false,
-            message: `Не удалось закрыть позицию для символа ${symbol}`
-          });
-        }
-        
-        // Обновляем список открытых позиций
-        await tradingBot.positionManager.updateOpenPositions();
-        
-        return res.json({
-          success: true,
-          message: `Позиция для символа ${symbol} успешно закрыта`
-        });
-      } else {
-        return res.status(404).json({
-          success: false,
-          message: 'Указанная позиция не найдена в списке открытых позиций'
-        });
-      }
-    }
-    
-    // Закрываем позицию по ID (через стандартный метод)
-    const result = await tradingBot.positionManager.closePosition(positionId, 100);
     
     if (!result) {
       return res.status(500).json({
         success: false,
-        message: 'Не удалось закрыть позицию'
+        message: `Не удалось закрыть позицию ${positionId ? `с ID ${positionId}` : `для символа ${symbol}`}`
       });
     }
     
@@ -220,7 +178,7 @@ exports.closePosition = async function(req, res) {
     
     return res.json({
       success: true,
-      message: `Позиция ${symbol || positionId} успешно закрыта`
+      message: `Позиция ${positionId ? positionId : symbol} успешно закрыта`
     });
   } catch (error) {
     logger.error(`Ошибка при закрытии позиции: ${error.message}`);

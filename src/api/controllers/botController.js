@@ -1,5 +1,4 @@
-// src/api/controllers/botController.js (исправленная версия)
-
+// src/api/controllers/botController.js
 const logger = require('../../utils/logger');
 const dataStore = require('../../utils/dataStore');
 let tradingBot = null;
@@ -20,7 +19,7 @@ exports.getStatus = function(req, res) {
     // Принудительно обновляем статус перед отправкой
     const status = tradingBot.getStatus();
     
-    // Отправляем текущий статус без попытки обновления баланса
+    // Отправляем текущий статус
     return res.json({
       success: true,
       data: status

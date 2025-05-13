@@ -1,4 +1,4 @@
-// api/apiClient.ts
+// client/src/api/apiClient.ts
 import axios from 'axios';
 import { 
   BotStatus, 
@@ -33,6 +33,12 @@ interface DataResponse<T> {
 
 interface ScanResponse extends ApiResponse {
   pairs?: TopPair[];
+}
+
+// Интерфейс для запроса закрытия позиции
+interface ClosePositionRequest {
+  positionId?: string;
+  symbol?: string;
 }
 
 // Функции для работы с API
@@ -79,8 +85,8 @@ export const api = {
       const response = await apiClient.get<Signal[]>('/signals/recent');
       return response.data;
     },
-    getIndicators: async (): Promise<{ [key: string]: any }> => {
-      const response = await apiClient.get<DataResponse<{ [key: string]: any }>>('/signals/indicators');
+    getIndicators: async (): Promise<Record<string, any>> => {
+      const response = await apiClient.get<DataResponse<Record<string, any>>>('/signals/indicators');
       return response.data.data;
     }
   },
@@ -119,15 +125,23 @@ export const api = {
       const response = await apiClient.post<ApiResponse>('/position/open', data);
       return response.data;
     },
-    close: async (positionId: string): Promise<ApiResponse> => {
-      console.log('API Client: closing position with ID:', positionId); // Отладочный лог
+    close: async (positionId?: string, symbol?: string): Promise<ApiResponse> => {
+      if (!positionId && !symbol) {
+        throw new Error('Необходимо указать ID позиции или символ пары');
+      }
       
-      // Явно передаем positionId в формате объекта
-      const requestData = { positionId: positionId };
-      console.log('API Client: sending request data:', requestData); // Отладочный лог
+      const requestData: ClosePositionRequest = {};
+      if (positionId) requestData.positionId = positionId;
+      if (symbol) requestData.symbol = symbol;
+      
+      console.log('API Client: closing position with data:', requestData);
       
       const response = await apiClient.post<ApiResponse>('/position/close', requestData);
       return response.data;
+    },
+    getActive: async (): Promise<TradingPair[]> => {
+      const response = await apiClient.get<DataResponse<TradingPair[]>>('/position/active');
+      return response.data.data;
     }
   }
 };

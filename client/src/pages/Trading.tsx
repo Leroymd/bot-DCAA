@@ -1,4 +1,4 @@
-// pages/Trading.tsx
+// client/src/pages/Trading.tsx
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, X } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -28,7 +28,7 @@ const Trading: React.FC = () => {
         const data = await api.pairs.getActive();
         
         // Фильтрация только активных позиций
-        const positions = data.filter(pair => pair.status === 'active');
+        const positions = data.filter((pair: TradingPair) => pair.status === 'active');
         setActivePositions(positions);
         
         setLoading(false);
@@ -78,7 +78,7 @@ const Trading: React.FC = () => {
   };
   
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setOrderFormData(prev => ({
       ...prev,
       [name]: name === 'leverage' ? parseInt(value, 10) : value
@@ -103,7 +103,7 @@ const Trading: React.FC = () => {
         
         // Обновляем список позиций
         const pairsData = await api.pairs.getActive();
-        const positions = pairsData.filter(pair => pair.status === 'active');
+        const positions = pairsData.filter((pair: TradingPair) => pair.status === 'active');
         setActivePositions(positions);
       } else {
         setError(response.message || 'Не удалось открыть позицию');

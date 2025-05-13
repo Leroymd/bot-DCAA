@@ -1,109 +1,79 @@
-// Основной файл приложения
-require('dotenv').config();
-var express = require('express');
-var cors = require('cors');
-var path = require('path');
-var setup = require('./src/bot/setup');
-var config = require('./src/config/default');
-var logger = require('./src/utils/logger');
+// Этот файл нужно добавить в ваш проект, если его еще нет
 
-// Контроллеры API
-var botRoutes = require('./src/api/routes/botRoutes');
-var pairsRoutes = require('./src/api/routes/pairsRoutes');
-var signalRoutes = require('./src/api/routes/signalRoutes');
-var performanceRoutes = require('./src/api/routes/performanceRoutes');
-var settingsRoutes = require('./src/api/routes/settingsRoutes');
-var positionRoutes = require('./src/api/routes/positionRoutes');
-// Создаем Express-приложение
-var app = express();
+// src/app.js или src/index.js - основной файл приложения 
+const express = require('express');
+const path = require('path');
+const cors = require('cors');
+const morgan = require('morgan');
+const logger = require('./src/utils/logger');
 
-// Настройки middleware
-app.use(cors(config.cors));
+// Импорт маршрутов
+const botRoutes = require('./src/api/routes/botRoutes');
+const pairsRoutes = require('./src/api/routes/pairsRoutes');
+const signalRoutes = require('./src/api/routes/signalRoutes');
+const performanceRoutes = require('./src/api/routes/performanceRoutes');
+const settingsRoutes = require('./src/api/routes/settingsRoutes');
+const positionRoutes = require('./src/api/routes/positionRoutes');
+
+// Настройка бота
+const botSetup = require('./src/bot/setup');
+
+// Создание приложения Express
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Промежуточное ПО
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/api/position', positionRoutes);
-// Простая проверка API ключа для безопасности (опционально)
-var apiKeyMiddleware = function(req, res, next) {
-  // В режиме разработки пропускаем проверку
-  if (process.env.NODE_ENV !== 'production') {
-    return next();
+
+// Логирование запросов
+app.use(morgan('dev', {
+  stream: {
+    write: (message) => logger.info(message.trim())
   }
-  
-  var apiKey = req.headers[config.security.apiKeyHeader.toLowerCase()];
-  
-  if (!apiKey || apiKey !== config.security.apiKey) {
-    return res.status(401).json({
-      success: false,
-      message: 'Unauthorized'
-    });
-  }
-  
-  next();
-};
+}));
 
-// Статические файлы для фронтенда
-app.use(express.static(path.join(__dirname, 'client/build')));
+// Статические файлы
+app.use(express.static(path.join(__dirname, '../client/build')));
 
-// API маршруты с проверкой API ключа
-app.use('/api/bot', apiKeyMiddleware, botRoutes);
-app.use('/api/pairs', apiKeyMiddleware, pairsRoutes);
-app.use('/api/signals', apiKeyMiddleware, signalRoutes);
-app.use('/api/performance', apiKeyMiddleware, performanceRoutes);
-app.use('/api/settings', apiKeyMiddleware, settingsRoutes);
+// Маршруты API
+app.use('/api/bot', botRoutes);
+app.use('/api/pairs', pairsRoutes);
+app.use('/api/signals', signalRoutes);
+app.use('/api/performance', performanceRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/position', positionRoutes); // Важный маршрут для работы с позициями
 
-// Обработка запросов к React-приложению
-app.get('*', function(req, res) {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+// Обработка всех остальных запросов
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
-const resetAllDemoData = require('./src/utils/resetDemoData');
 
-// Инициализация сервера и бота
-function startServer() {
-  try {
-    // Сброс всех демо-данных при запуске
-    resetAllDemoData();
-    
-    // Инициализация бота
-    setup.setupBot().then(function() {
-      // Запуск сервера
-      var PORT = config.server.port;
-      app.listen(PORT, function() {
-        logger.info('Server running on port ' + PORT);
-        
-        // Автоматический запуск бота, если включен в настройках
-        setup.autoStartBot();
-      });
-    }).catch(function(error) {
-      logger.error('Failed to setup bot: ' + error.message);
-      process.exit(1);
-    });
-  } catch (error) {
-    logger.error('Failed to start server: ' + error.message);
-    process.exit(1);
-  }
-}
-// Инициализация сервера и бота
-function startServer() {
-  try {
-    // Инициализация бота
-    setup.setupBot().then(function() {
-      // Запуск сервера
-      var PORT = config.server.port;
-      app.listen(PORT, function() {
-        logger.info('Server running on port ' + PORT);
-        
-        // Автоматический запуск бота, если включен в настройках
-        setup.autoStartBot();
-      });
-    }).catch(function(error) {
-      logger.error('Failed to setup bot: ' + error.message);
-      process.exit(1);
-    });
-  } catch (error) {
-    logger.error('Failed to start server: ' + error.message);
-    process.exit(1);
-  }
-}
+// Обработка ошибок
+app.use((err, req, res, next) => {
+  logger.error(`Ошибка: ${err.message}`);
+  res.status(500).json({
+    success: false,
+    message: 'Ошибка сервера',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
 
-// Запуск приложения
-startServer();
+// Инициализация бота и запуск сервера
+botSetup.setupBot()
+  .then((bot) => {
+    logger.info('Бот успешно инициализирован');
+
+    // Автоматический запуск бота, если включено
+    return botSetup.autoStartBot();
+  })
+  .then(() => {
+    app.listen(PORT, () => {
+      logger.info(`Сервер запущен на порту ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    logger.error(`Ошибка при инициализации: ${error.message}`);
+    process.exit(1);
+  });
