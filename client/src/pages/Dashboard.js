@@ -1,32 +1,24 @@
+// client/src/pages/Dashboard.tsx - улучшенная версия с возможностью удаления пар
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Bell, Settings, TrendingUp, Activity, DollarSign, Clock, CheckCircle, AlertCircle, ArrowUp, ArrowDown, RefreshCw, Play, Pause } from 'lucide-react';
+import { Bell, Settings, TrendingUp, Activity, DollarSign, Clock, 
+         RefreshCw, CheckCircle, AlertCircle, ArrowUp, ArrowDown, 
+         Loader, Trash2, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../api/apiClient';
+import { useAppContext } from '../contexts/AppContext';
+import { Layout } from '../components/Layout';
 
-const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const Dashboard: React.FC = () => {
+  const { botStatus, loading: botLoading, error: botError, updateBotStatus } = useAppContext();
   
-  // Состояния данных бота
-  const [botStatus, setBotStatus] = useState({
-    isActive: false,
-    balance: 0,
-    totalProfit: 0,
-    profitPercentage: 0,
-    todayProfit: 0,
-    todayProfitPercentage: 0,
-    winRate: 0,
-    totalTrades: 0,
-    avgProfit: 0,
-    withdrawn: 0,
-    lastScan: null
-  });
-  const [tradingPairs, setTradingPairs] = useState([]);
-  const [topPairs, setTopPairs] = useState([]);
-  const [recentSignals, setRecentSignals] = useState([]);
-  const [pnlData, setPnlData] = useState([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tradingPairs, setTradingPairs] = useState<any[]>([]);
+  const [topPairs, setTopPairs] = useState<any[]>([]);
+  const [recentSignals, setRecentSignals] = useState<any[]>([]);
+  const [pnlData, setPnlData] = useState<any[]>([]);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   
   // Загрузка данных при монтировании компонента
   useEffect(() => {
@@ -34,27 +26,21 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Получение статуса бота
-        const statusResponse = await axios.get('/api/bot/status');
-        if (statusResponse.data.success) {
-          setBotStatus(statusResponse.data.data);
-        }
-        
         // Получение активных торговых пар
-        const pairsResponse = await axios.get('/api/pairs/active');
-        setTradingPairs(pairsResponse.data);
+        const pairsResponse = await api.pairs.getActive();
+        setTradingPairs(pairsResponse);
         
         // Получение топ пар из сканирования
-        const topPairsResponse = await axios.get('/api/pairs/top');
-        setTopPairs(topPairsResponse.data);
+        const topPairsResponse = await api.pairs.getTop();
+        setTopPairs(topPairsResponse);
         
         // Получение недавних сигналов
-        const signalsResponse = await axios.get('/api/signals/recent');
-        setRecentSignals(signalsResponse.data);
+        const signalsResponse = await api.signals.getRecent();
+        setRecentSignals(signalsResponse);
         
         // Получение истории PnL
-        const pnlResponse = await axios.get('/api/performance/pnl');
-        setPnlData(pnlResponse.data);
+        const pnlResponse = await api.performance.getPnlData(7);
+        setPnlData(pnlResponse);
         
         setLoading(false);
       } catch (err) {
@@ -74,23 +60,17 @@ const Dashboard = () => {
   // Обработчик запуска и остановки бота
   const toggleBotStatus = async () => {
     try {
-      const endpoint = botStatus.isActive ? '/api/bot/stop' : '/api/bot/start';
-      setLoading(true);
-      const response = await axios.post(endpoint);
-      
-      if (response.data.success) {
-        setBotStatus(prev => ({
-          ...prev,
-          isActive: !prev.isActive
-        }));
+      if (botStatus.isActive) {
+        await api.bot.stop();
       } else {
-        setError(response.data.message || 'Не удалось изменить статус бота');
+        await api.bot.start();
       }
-      setLoading(false);
+      
+      // Обновляем статус бота
+      await updateBotStatus();
     } catch (err) {
       console.error('Ошибка при изменении статуса бота:', err);
       setError('Произошла ошибка при изменении статуса бота');
-      setLoading(false);
     }
   };
   
@@ -98,18 +78,13 @@ const Dashboard = () => {
   const refreshScan = async () => {
     try {
       setLoading(true);
-      const response = await axios.post('/api/pairs/scan');
+      const response = await api.pairs.scan();
       
-      if (response.data.success) {
-        setTopPairs(response.data.pairs);
-        
-        // Обновляем время последнего сканирования в botStatus
-        setBotStatus(prev => ({
-          ...prev,
-          lastScan: new Date().toLocaleString('ru-RU')
-        }));
+      if (response.success) {
+        setTopPairs(response.pairs || []);
+        await updateBotStatus(); // Обновляем статус, включая lastScan
       } else {
-        setError(response.data.message || 'Не удалось обновить результаты сканирования');
+        setError(response.message || 'Не удалось обновить результаты сканирования');
       }
       setLoading(false);
     } catch (err) {
@@ -120,18 +95,16 @@ const Dashboard = () => {
   };
   
   // Обработчик выбора пары для торговли
-  const selectPairForTrading = async (pair) => {
+  const selectPairForTrading = async (pair: string) => {
     try {
-      const response = await axios.post('/api/pairs/select', {
-        pair
-      });
+      const response = await api.pairs.select(pair);
       
-      if (response.data.success) {
+      if (response.success) {
         // Обновляем список активных пар
-        const pairsResponse = await axios.get('/api/pairs/active');
-        setTradingPairs(pairsResponse.data);
+        const pairsResponse = await api.pairs.getActive();
+        setTradingPairs(pairsResponse);
       } else {
-        setError(response.data.message || 'Не удалось добавить пару для торговли');
+        setError(response.message || 'Не удалось добавить пару для торговли');
       }
     } catch (err) {
       console.error('Ошибка при выборе пары:', err);
@@ -139,104 +112,72 @@ const Dashboard = () => {
     }
   };
   
-  if (loading && !botStatus.isActive) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+  // Новый обработчик для удаления пары
+  const removePairFromTrading = async (pair: string) => {
+    try {
+      const response = await api.pairs.remove(pair);
+      
+      if (response.success) {
+        // Обновляем список активных пар
+        const pairsResponse = await api.pairs.getActive();
+        setTradingPairs(pairsResponse);
+        // Сбрасываем подтверждение
+        setConfirmRemove(null);
+      } else {
+        setError(response.message || 'Не удалось удалить пару из списка');
+      }
+    } catch (err) {
+      console.error('Ошибка при удалении пары:', err);
+      setError('Произошла ошибка при удалении пары');
+    }
+  };
+  
+  // Закрытие позиции
+  const closePosition = async (positionId: string, symbol: string) => {
+    try {
+      const response = await api.position.close(positionId, symbol);
+      
+      if (response.success) {
+        // Обновляем список активных пар
+        const pairsResponse = await api.pairs.getActive();
+        setTradingPairs(pairsResponse);
+      } else {
+        setError(response.message || 'Не удалось закрыть позицию');
+      }
+    } catch (err) {
+      console.error('Ошибка при закрытии позиции:', err);
+      setError('Произошла ошибка при закрытии позиции');
+    }
+  };
+  
+  const currentError = botError || error;
+  
+  if (loading && botLoading) {
+    return <Layout botStatus={botStatus}>
+      <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center text-gray-100">
-          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <Loader className="w-12 h-12 animate-spin text-blue-400 mb-4" />
           <p className="text-lg">Загрузка данных...</p>
         </div>
       </div>
-    );
-  }
-  
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <div className="flex flex-col items-center text-gray-100 p-8 bg-gray-800 rounded-lg border border-red-500">
-          <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Ошибка</h2>
-          <p className="text-center mb-4">{error}</p>
-          <button 
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md"
-            onClick={() => window.location.reload()}
-          >
-            Перезагрузить страницу
-          </button>
-        </div>
-      </div>
-    );
+    </Layout>;
   }
   
   return (
-    <div className="flex flex-col min-h-screen bg-gray-900 text-gray-100">
-      {/* Шапка */}
-      <header className="bg-gray-800 p-4 flex justify-between items-center border-b border-gray-700">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold text-blue-400">FractalScalp Bot</h1>
-          <div className={`${botStatus.isActive ? 'bg-green-600' : 'bg-red-600'} text-white text-xs px-2 py-1 rounded`}>
-            {botStatus.isActive ? 'АКТИВЕН' : 'ОСТАНОВЛЕН'}
+    <Layout botStatus={botStatus}>
+      <div className="container mx-auto px-4 py-6">
+        {currentError && (
+          <div className="bg-red-800 text-white p-4 rounded-lg mb-6 flex justify-between items-center">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {currentError}
+            </div>
+            <button onClick={() => setError(null)}>
+              <ChevronDown className="w-5 h-5" />
+            </button>
           </div>
-        </div>
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-2 bg-gray-700 px-3 py-1 rounded-md">
-            <DollarSign className="w-4 h-4 text-green-400" />
-            <span>{botStatus.balance?.toFixed(2) || '0.00'} USDT</span>
-          </div>
-          <button className="text-gray-300 hover:text-white">
-            <Bell className="w-5 h-5" />
-          </button>
-          <Link to="/settings" className="text-gray-300 hover:text-white">
-            <Settings className="w-5 h-5" />
-          </Link>
-        </div>
-      </header>
-      
-      {/* Навигация */}
-      <nav className="bg-gray-800 border-b border-gray-700">
-        <div className="container mx-auto px-4">
-          <div className="flex space-x-6">
-            <Link 
-              to="/"
-              className={`py-3 px-1 ${activeTab === 'dashboard' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-100'}`}
-              onClick={() => setActiveTab('dashboard')}
-            >
-              Дашборд
-            </Link>
-            <Link 
-              to="/trading"
-              className={`py-3 px-1 ${activeTab === 'trading' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-100'}`}
-              onClick={() => setActiveTab('trading')}
-            >
-              Торговля
-            </Link>
-            <Link 
-              to="/signals"
-              className={`py-3 px-1 ${activeTab === 'signals' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-100'}`}
-              onClick={() => setActiveTab('signals')}
-            >
-              Сигналы
-            </Link>
-            <Link 
-              to="/stats"
-              className={`py-3 px-1 ${activeTab === 'stats' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-100'}`}
-              onClick={() => setActiveTab('stats')}
-            >
-              Статистика
-            </Link>
-            <Link 
-              to="/settings"
-              className={`py-3 px-1 ${activeTab === 'settings' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-100'}`}
-              onClick={() => setActiveTab('settings')}
-            >
-              Настройки
-            </Link>
-          </div>
-        </div>
-      </nav>
-      
-      {/* Основной контент */}
-      <main className="flex-1 container mx-auto px-4 py-6">
+        )}
+        
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Левая колонка - Информация о производительности */}
           <div className="xl:col-span-2 space-y-6">
@@ -341,6 +282,7 @@ const Dashboard = () => {
                       <th className="pb-2 font-medium">Прибыль</th>
                       <th className="pb-2 font-medium">Время</th>
                       <th className="pb-2 font-medium">Сигналы</th>
+                      <th className="pb-2 font-medium">Действия</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -361,16 +303,53 @@ const Dashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td className={pair.profit > 0 ? 'text-green-400' : pair.profit < 0 ? 'text-red-400' : 'text-gray-400'}>
-                            {pair.profit > 0 ? '+' : ''}{pair.profit?.toFixed(2) || '0.00'}%
+                          <td className={pair.profit && pair.profit > 0 ? 'text-green-400' : pair.profit && pair.profit < 0 ? 'text-red-400' : 'text-gray-400'}>
+                            {pair.profit && pair.profit > 0 ? '+' : ''}{pair.profit?.toFixed(2) || '0.00'}%
                           </td>
                           <td>{pair.time || '-'}</td>
                           <td>{pair.signals || 0}</td>
+                          <td className="flex space-x-2">
+                            {/* Закрытие позиции, если активна */}
+                            {pair.status === 'active' && (
+                              <button 
+                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 rounded"
+                                onClick={() => closePosition(pair.id, pair.pair)}
+                              >
+                                Закрыть
+                              </button>
+                            )}
+                            {/* Кнопка удаления пары (с подтверждением) */}
+                            {confirmRemove === pair.pair ? (
+                              <div className="flex space-x-1">
+                                <button 
+                                  className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 rounded"
+                                  onClick={() => removePairFromTrading(pair.pair)}
+                                >
+                                  Да
+                                </button>
+                                <button 
+                                  className="text-xs px-2 py-1 bg-gray-600 hover:bg-gray-700 rounded"
+                                  onClick={() => setConfirmRemove(null)}
+                                >
+                                  Нет
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                className="text-xs p-1 bg-gray-700 hover:bg-gray-600 rounded"
+                                onClick={() => setConfirmRemove(pair.pair)}
+                                disabled={pair.status === 'active'} // Блокируем удаление активных пар
+                                title={pair.status === 'active' ? 'Сначала закройте позицию' : 'Удалить пару'}
+                              >
+                                <Trash2 className={`w-4 h-4 ${pair.status === 'active' ? 'text-gray-500' : 'text-gray-300'}`} />
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="6" className="py-4 text-center text-gray-400">
+                        <td colSpan={7} className="py-4 text-center text-gray-400">
                           Нет активных торговых пар
                         </td>
                       </tr>
@@ -388,20 +367,10 @@ const Dashboard = () => {
               <h3 className="font-bold mb-4">Управление</h3>
               <div className="flex flex-col space-y-3">
                 <button 
-                  className={`w-full py-2 px-4 rounded-md text-white font-medium flex items-center justify-center ${botStatus.isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
+                  className={`w-full py-2 px-4 rounded-md text-white font-medium ${botStatus.isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                   onClick={toggleBotStatus}
                 >
-                  {botStatus.isActive ? (
-                    <>
-                      <Pause className="w-4 h-4 mr-2" />
-                      Остановить бота
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 mr-2" />
-                      Запустить бота
-                    </>
-                  )}
+                  {botStatus.isActive ? 'Остановить бота' : 'Запустить бота'}
                 </button>
                 <button 
                   className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-md text-white font-medium flex items-center justify-center"
@@ -410,7 +379,7 @@ const Dashboard = () => {
                 >
                   {loading ? (
                     <span className="flex items-center justify-center">
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+                      <Loader className="w-4 h-4 animate-spin mr-2" />
                       Обновление...
                     </span>
                   ) : (
@@ -496,7 +465,7 @@ const Dashboard = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="5" className="py-4 text-center text-gray-400">
+                        <td colSpan={5} className="py-4 text-center text-gray-400">
                           Нет данных сканирования
                         </td>
                       </tr>
@@ -543,13 +512,8 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </main>
-      
-      {/* Футер */}
-      <footer className="bg-gray-800 border-t border-gray-700 p-4 text-center text-gray-400 text-sm">
-        FractalScalp Bot v1.0.0 — Система торговли на основе фракталов
-      </footer>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

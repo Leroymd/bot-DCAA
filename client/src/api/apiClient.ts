@@ -1,4 +1,4 @@
-// client/src/api/apiClient.ts
+// client/src/api/apiClient.ts - исправленная версия
 import axios from 'axios';
 import { 
   BotStatus, 
@@ -33,12 +33,6 @@ interface DataResponse<T> {
 
 interface ScanResponse extends ApiResponse {
   pairs?: TopPair[];
-}
-
-// Интерфейс для запроса закрытия позиции
-interface ClosePositionRequest {
-  positionId?: string;
-  symbol?: string;
 }
 
 // Функции для работы с API
@@ -76,6 +70,11 @@ export const api = {
     select: async (pair: string): Promise<ApiResponse> => {
       const response = await apiClient.post<ApiResponse>('/pairs/select', { pair });
       return response.data;
+    },
+    // Добавляем метод для удаления пары
+    remove: async (pair: string): Promise<ApiResponse> => {
+      const response = await apiClient.post<ApiResponse>('/pairs/remove', { pair });
+      return response.data;
     }
   },
   
@@ -85,8 +84,8 @@ export const api = {
       const response = await apiClient.get<Signal[]>('/signals/recent');
       return response.data;
     },
-    getIndicators: async (): Promise<Record<string, any>> => {
-      const response = await apiClient.get<DataResponse<Record<string, any>>>('/signals/indicators');
+    getIndicators: async (): Promise<{ [key: string]: any }> => {
+      const response = await apiClient.get<DataResponse<{ [key: string]: any }>>('/signals/indicators');
       return response.data.data;
     }
   },
@@ -119,29 +118,77 @@ export const api = {
     }
   },
   
-  // Функции для работы с позициями
+  // Обновленные функции для работы с позициями
   position: {
+    // Открытие позиции с опциональными TP/SL
     open: async (data: OrderFormData): Promise<ApiResponse> => {
       const response = await apiClient.post<ApiResponse>('/position/open', data);
       return response.data;
     },
-    close: async (positionId?: string, symbol?: string): Promise<ApiResponse> => {
-      if (!positionId && !symbol) {
-        throw new Error('Необходимо указать ID позиции или символ пары');
-      }
+    
+    // Закрытие позиции - поддерживает как ID, так и символ
+    close: async (positionId: string, symbol?: string): Promise<ApiResponse> => {
+      console.log('API Client: closing position with ID:', positionId, 'Symbol:', symbol); 
       
-      const requestData: ClosePositionRequest = {};
-      if (positionId) requestData.positionId = positionId;
-      if (symbol) requestData.symbol = symbol;
-      
-      console.log('API Client: closing position with data:', requestData);
+      const requestData = { 
+        positionId: positionId,
+        symbol: symbol 
+      };
       
       const response = await apiClient.post<ApiResponse>('/position/close', requestData);
       return response.data;
     },
-    getActive: async (): Promise<TradingPair[]> => {
-      const response = await apiClient.get<DataResponse<TradingPair[]>>('/position/active');
-      return response.data.data;
+    
+    // Закрытие по символу
+    closeBySymbol: async (symbol: string): Promise<ApiResponse> => {
+      console.log('API Client: closing position by symbol:', symbol);
+      
+      const response = await apiClient.post<ApiResponse>('/position/close', { symbol });
+      return response.data;
+    },
+    
+    // Установка или изменение TP/SL
+    setTpsl: async (
+      symbol: string, 
+      holdSide: 'long' | 'short', 
+      takeProfitPrice?: number, 
+      stopLossPrice?: number
+    ): Promise<ApiResponse> => {
+      const requestData: any = {
+        symbol,
+        holdSide
+      };
+      
+      if (takeProfitPrice) {
+        requestData.takeProfitPrice = takeProfitPrice;
+      }
+      
+      if (stopLossPrice) {
+        requestData.stopLossPrice = stopLossPrice;
+      }
+      
+      const response = await apiClient.post<ApiResponse>('/position/tpsl', requestData);
+      return response.data;
+    },
+    
+    // Установка трейлинг-стопа
+    setTrailingStop: async (
+      symbol: string, 
+      holdSide: 'long' | 'short', 
+      callbackRatio: number
+    ): Promise<ApiResponse> => {
+      const response = await apiClient.post<ApiResponse>('/position/trailing-stop', {
+        symbol,
+        holdSide,
+        callbackRatio
+      });
+      return response.data;
+    },
+    
+    // Получение всех открытых позиций
+    getActive: async (): Promise<any[]> => {
+      const response = await apiClient.get<DataResponse<any[]>>('/position/active');
+      return response.data.data || [];
     }
   }
 };

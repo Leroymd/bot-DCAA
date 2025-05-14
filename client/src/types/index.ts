@@ -1,3 +1,4 @@
+// client/src/types/index.ts - обновленная версия
 // Начнем с определения типов данных
 // types/index.ts
 export interface BotStatus {
@@ -79,4 +80,15 @@ export interface OrderFormData {
   type: 'LONG' | 'SHORT';
   size: string;
   leverage: number;
+  takeProfitPrice?: string;
+  stopLossPrice?: string;
+}
+
+export interface TpSlFormData {
+  takeProfitPrice: string;
+  stopLossPrice: string;
+}
+
+export interface TrailingStopFormData {
+  callbackRatio: string;
 }

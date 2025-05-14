@@ -1,4 +1,4 @@
-// src/api/controllers/positionController.js
+// src/api/controllers/positionController.js - исправленная версия
 const logger = require('../../utils/logger');
 const { getBot } = require('../../bot/setup');
 
@@ -13,7 +13,7 @@ exports.openPosition = async function(req, res) {
       });
     }
     
-    const { symbol, type, size, leverage } = req.body;
+    const { symbol, type, size, leverage, takeProfitPrice, stopLossPrice } = req.body;
     
     if (!symbol || !type || !size) {
       return res.status(400).json({
@@ -47,7 +47,7 @@ exports.openPosition = async function(req, res) {
         
         logger.info(`Временно установлено плечо ${leverage}x для ${symbol}`);
         
-        // Открываем позицию с указанными параметрами
+        // Открываем позицию с указанными параметрами, включая TP/SL
         const parsedSize = parseFloat(size);
         const position = await tradingBot.positionManager.openPosition(
           type.toUpperCase(),
@@ -55,7 +55,9 @@ exports.openPosition = async function(req, res) {
           price,
           'Ручное открытие позиции через интерфейс',
           null,
-          parsedSize // Передаем размер позиции как последний параметр
+          parsedSize,
+          takeProfitPrice ? parseFloat(takeProfitPrice) : null,
+          stopLossPrice ? parseFloat(stopLossPrice) : null
         );
         
         // Восстанавливаем исходное плечо
@@ -93,7 +95,9 @@ exports.openPosition = async function(req, res) {
         price,
         'Ручное открытие позиции через интерфейс',
         null,
-        parsedSize // Передаем размер позиции как последний параметр
+        parsedSize,
+        takeProfitPrice ? parseFloat(takeProfitPrice) : null,
+        stopLossPrice ? parseFloat(stopLossPrice) : null
       );
       
       if (!position) {
@@ -144,7 +148,7 @@ exports.closePosition = async function(req, res) {
       positionId = req.body.id;
     }
     
-    // Если нет positionId, но есть symbol, используем symbol для поиска позиции
+    // Проверка наличия необходимых параметров
     if (!positionId && !symbol) {
       logger.error('Не указан ID позиции или символ пары в запросе на закрытие');
       return res.status(400).json({
@@ -153,23 +157,23 @@ exports.closePosition = async function(req, res) {
       });
     }
     
-    let result = false;
+    let result;
     
-    // Если указан positionId, закрываем по ID
-    if (positionId) {
-      logger.info(`Закрытие позиции по ID: ${positionId}`);
-      result = await tradingBot.positionManager.closePosition(positionId, 100);
-    } 
-    // Если указан symbol, закрываем по символу
-    else if (symbol) {
+    // Если указан символ (но нет ID), закрываем по символу
+    if (symbol && !positionId) {
       logger.info(`Закрытие позиции по символу: ${symbol}`);
       result = await tradingBot.positionManager.closePositionBySymbol(symbol);
+    } 
+    // Если указан ID, закрываем по ID
+    else if (positionId) {
+      logger.info(`Закрытие позиции по ID: ${positionId}`);
+      result = await tradingBot.positionManager.closePosition(positionId);
     }
     
     if (!result) {
       return res.status(500).json({
         success: false,
-        message: `Не удалось закрыть позицию ${positionId ? `с ID ${positionId}` : `для символа ${symbol}`}`
+        message: 'Не удалось закрыть позицию'
       });
     }
     
@@ -178,7 +182,7 @@ exports.closePosition = async function(req, res) {
     
     return res.json({
       success: true,
-      message: `Позиция ${positionId ? positionId : symbol} успешно закрыта`
+      message: `Позиция ${symbol || positionId} успешно закрыта`
     });
   } catch (error) {
     logger.error(`Ошибка при закрытии позиции: ${error.message}`);
@@ -200,7 +204,7 @@ exports.getActivePositions = async function(req, res) {
       });
     }
     
-    // Получаем текущие открытые позиции
+    // Обновляем и получаем текущие открытые позиции
     const positions = await tradingBot.positionManager.updateOpenPositions();
     
     return res.json({
@@ -209,6 +213,113 @@ exports.getActivePositions = async function(req, res) {
     });
   } catch (error) {
     logger.error(`Ошибка при получении активных позиций: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Новый метод для установки TP/SL
+exports.setTpsl = async function(req, res) {
+  try {
+    const tradingBot = getBot();
+    
+    if (!tradingBot || !tradingBot.positionManager) {
+      return res.status(500).json({
+        success: false,
+        message: 'Торговый бот не инициализирован или отсутствует менеджер позиций'
+      });
+    }
+    
+    const { symbol, holdSide, takeProfitPrice, stopLossPrice } = req.body;
+    
+    if (!symbol || !holdSide) {
+      return res.status(400).json({
+        success: false,
+        message: 'Не указаны обязательные параметры (symbol, holdSide)'
+      });
+    }
+    
+    // Хотя бы одно из TP/SL должно быть указано
+    if (!takeProfitPrice && !stopLossPrice) {
+      return res.status(400).json({
+        success: false,
+        message: 'Необходимо указать хотя бы одно из значений: takeProfitPrice или stopLossPrice'
+      });
+    }
+    
+    logger.info(`Запрос на установку TP/SL: ${symbol}, ${holdSide}, TP=${takeProfitPrice}, SL=${stopLossPrice}`);
+    
+    const result = await tradingBot.positionManager.setTpsl(
+      symbol,
+      holdSide,
+      takeProfitPrice,
+      stopLossPrice
+    );
+    
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: 'Не удалось установить TP/SL'
+      });
+    }
+    
+    return res.json({
+      success: true,
+      message: `TP/SL успешно установлены для ${symbol}`
+    });
+  } catch (error) {
+    logger.error(`Ошибка при установке TP/SL: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// Новый метод для установки трейлинг-стопа
+exports.setTrailingStop = async function(req, res) {
+  try {
+    const tradingBot = getBot();
+    
+    if (!tradingBot || !tradingBot.positionManager) {
+      return res.status(500).json({
+        success: false,
+        message: 'Торговый бот не инициализирован или отсутствует менеджер позиций'
+      });
+    }
+    
+    const { symbol, holdSide, callbackRatio } = req.body;
+    
+    if (!symbol || !holdSide || !callbackRatio) {
+      return res.status(400).json({
+        success: false,
+        message: 'Не указаны обязательные параметры (symbol, holdSide, callbackRatio)'
+      });
+    }
+    
+    logger.info(`Запрос на установку трейлинг-стопа: ${symbol}, ${holdSide}, callbackRatio=${callbackRatio}`);
+    
+    const result = await tradingBot.positionManager.setTrailingStop(
+      symbol,
+      holdSide,
+      callbackRatio
+    );
+    
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: 'Не удалось установить трейлинг-стоп'
+      });
+    }
+    
+    return res.json({
+      success: true,
+      message: `Трейлинг-стоп успешно установлен для ${symbol}`
+    });
+  } catch (error) {
+    logger.error(`Ошибка при установке трейлинг-стопа: ${error.message}`);
     return res.status(500).json({
       success: false,
       message: error.message

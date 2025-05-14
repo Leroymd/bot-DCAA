@@ -1,4 +1,4 @@
-// src/api/controllers/pairsController.js
+// src/api/controllers/pairsController.js - исправленная версия
 const logger = require('../../utils/logger');
 const dataStore = require('../../utils/dataStore');
 const { getBot } = require('../../bot/setup');
@@ -154,6 +154,69 @@ exports.selectPair = function(req, res) {
     });
   }).catch(function(error) {
     logger.error('Ошибка выбора пары: ' + error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  });
+};
+
+// Новый метод для удаления пары из списка торгуемых
+exports.removePair = function(req, res) {
+  const tradingBot = getBot();
+  
+  if (!tradingBot) {
+    return res.status(500).json({
+      success: false,
+      message: 'Торговый бот не инициализирован'
+    });
+  }
+  
+  const pair = req.body.pair;
+  
+  if (!pair) {
+    return res.status(400).json({
+      success: false,
+      message: 'Параметр пары обязателен'
+    });
+  }
+  
+  // Проверяем, есть ли открытые позиции по этой паре
+  tradingBot.positionManager.updateOpenPositions().then(positions => {
+    const hasActivePosition = positions.some(p => p.symbol === pair);
+    
+    if (hasActivePosition) {
+      return res.status(400).json({
+        success: false,
+        message: `Нельзя удалить пару ${pair}, так как по ней есть открытая позиция. Сначала закройте позицию.`
+      });
+    }
+    
+    // Удаляем пару из списка торгуемых
+    if (tradingBot.config.tradingPairs.includes(pair)) {
+      tradingBot.config.tradingPairs = tradingBot.config.tradingPairs.filter(p => p !== pair);
+      
+      // Сохраняем обновленный список пар
+      dataStore.set('botConfig', tradingBot.config);
+      
+      // Обновляем кэш tradingPairs
+      const tradingPairs = dataStore.get('tradingPairs') || [];
+      dataStore.set('tradingPairs', tradingPairs.filter(p => p.pair !== pair));
+      
+      logger.info(`Пара ${pair} удалена из списка торгуемых`);
+      
+      return res.json({
+        success: true,
+        message: `Пара ${pair} удалена из списка торгуемых`
+      });
+    } else {
+      return res.status(404).json({
+        success: false,
+        message: `Пара ${pair} не найдена в списке торгуемых`
+      });
+    }
+  }).catch(error => {
+    logger.error(`Ошибка при удалении пары: ${error.message}`);
     return res.status(500).json({
       success: false,
       message: error.message

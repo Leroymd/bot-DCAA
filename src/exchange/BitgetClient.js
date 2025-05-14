@@ -1,9 +1,12 @@
-// src/exchange/BitGetClient.js
+// src/exchange/BitgetClient.js - исправленная версия
 const axios = require('axios');
 const crypto = require('crypto');
 const querystring = require('querystring');
 const logger = require('../utils/logger');
 
+/**
+ * Клиент API Bitget с исправленными методами согласно актуальной документации
+ */
 class BitGetClient {
   constructor(options = {}) {
     this.apiKey = options.apiKey || '';
@@ -166,23 +169,11 @@ class BitGetClient {
     }
   }
 
-  // Метод для получения времени сервера
   async getServerTime() {
     try {
       return await this.request('GET', '/api/v2/public/time');
     } catch (error) {
       logger.error(`Ошибка в getServerTime: ${error.message}`);
-      throw error;
-    }
-  }
-
-  // Добавляем алиас метода для совместимости с ожидаемым API
-  async publicGetTime() {
-    try {
-      logger.info('Вызван метод publicGetTime (алиас для getServerTime)');
-      return await this.getServerTime();
-    } catch (error) {
-      logger.error(`Ошибка в publicGetTime: ${error.message}`);
       throw error;
     }
   }
@@ -250,14 +241,23 @@ class BitGetClient {
     });
   }
 
+  // Исправленный метод для отправки ордера согласно актуальной документации
   async submitOrder(params) {
+    // Проверяем обязательные параметры
+    if (!params.timeInForceValue) {
+      // По умолчанию используем normal, если не указано
+      params.timeInForceValue = 'normal';
+    }
+    
     const orderParams = {
       ...params,
       productType: "USDT-FUTURES"
     };
+    
     return this.request('POST', '/api/v2/mix/order/place-order', {}, orderParams);
   }
 
+  // Исправленный метод для отправки плановых ордеров (TP/SL, трейлинг-стоп)
   async submitPlanOrder(params) {
     if (!params.planType) {
       params.planType = params.callbackRatio ? "trailing_stop_plan" : "normal_plan";
@@ -267,8 +267,8 @@ class BitGetClient {
       params.tradeSide = "close";
     }
     
-    if (!params.force) {
-      params.force = "gtc";
+    if (!params.timeInForceValue) {
+      params.timeInForceValue = "normal";
     }
     
     if (!params.triggerType) {
@@ -299,6 +299,15 @@ class BitGetClient {
       symbol,
       marginCoin,
       orderId,
+      productType: "USDT-FUTURES"
+    });
+  }
+
+  // Новый метод для закрытия позиции напрямую
+  async closePosition(symbol, marginCoin = 'USDT') {
+    return this.request('POST', '/api/v2/mix/position/close-position', {}, {
+      symbol,
+      marginCoin,
       productType: "USDT-FUTURES"
     });
   }
@@ -429,6 +438,7 @@ class BitGetClient {
     return value.toString().split(".")[1].length || 0;
   }
 
+  // Исправленный метод размещения ордеров с поддержкой TP/SL при открытии позиции
   async placeOrder(symbol, side, orderType, size, price = null, reduceOnly = false, tradeSide = "open") {
     if (!symbol) {
       const error = new Error('Для размещения ордера необходим символ');
@@ -441,14 +451,15 @@ class BitGetClient {
       return Promise.reject(new Error(`Неверное значение стороны: ${side}`));
     }
 
-    // Проверяем значение tradeSide
-    const validTradeSide = tradeSide.toLowerCase();
-    if (validTradeSide !== 'open' && validTradeSide !== 'close') {
-      logger.error(`Неверное значение tradeSide: ${tradeSide}`);
-      return Promise.reject(new Error(`Неверное значение tradeSide. Допустимые значения: open, close`));
-    }
-
     try {
+      // Определяем правильное значение tradeSide согласно документации
+      let formattedTradeSide;
+      if (tradeSide === "open") {
+        formattedTradeSide = normalizedSide === 'buy' ? 'open_long' : 'open_short';
+      } else {
+        formattedTradeSide = normalizedSide === 'buy' ? 'close_short' : 'close_long';
+      }
+
       // Для лимитных ордеров получаем информацию о символе для правильного форматирования цены
       let formattedPrice = price;
       if (orderType.toLowerCase() === 'limit' && price) {
@@ -466,23 +477,20 @@ class BitGetClient {
         size: size.toString(),
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
-        force: 'gtc', // Good-Till-Cancel
+        timeInForceValue: 'normal', // Обязательный параметр согласно документации
+        tradeSide: formattedTradeSide,
         marginMode: 'isolated',
-        clientOid: `order_${Date.now()}`,
-        tradeSide: validTradeSide,
         productType: "USDT-FUTURES"
       };
 
       if (reduceOnly === true) {
-        params.tradeSide = "close"; // Всегда используем close при reduceOnly=true
-        params.reduceOnly = "YES"; // Bitget требует строку "YES"
+        // При reduceOnly всегда используем close_long или close_short
+        params.tradeSide = normalizedSide === 'buy' ? 'close_short' : 'close_long';
+        params.reduceOnly = "YES";
       }
 
       if (orderType.toLowerCase() === 'limit' && formattedPrice) {
         params.price = formattedPrice.toString();
-        // Для Bitget V2 API нужно использовать timeInForce вместо force
-        params.timeInForce = params.force;
-        delete params.force;
       }
 
       if (this.debug) {
@@ -496,6 +504,90 @@ class BitGetClient {
       return result;
     } catch (error) {
       logger.error(`Ошибка размещения ордера: ${error.message}`);
+      
+      if (error.response) {
+        logger.error('Данные ответа:', JSON.stringify(error.response.data));
+        logger.error('Статус ответа:', error.response.status);
+      }
+      
+      return Promise.reject(error);
+    }
+  }
+
+  // Новый метод для размещения ордера с установкой TP/SL в одном запросе
+  async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfitPrice = null, stopLossPrice = null) {
+    if (!symbol) {
+      const error = new Error('Для размещения ордера необходим символ');
+      return Promise.reject(error);
+    }
+
+    const normalizedSide = side.toLowerCase();
+    if (normalizedSide !== 'buy' && normalizedSide !== 'sell') {
+      logger.error(`Неверное значение стороны: ${side}`);
+      return Promise.reject(new Error(`Неверное значение стороны: ${side}`));
+    }
+
+    try {
+      // Определяем tradeSide на основе side
+      const formattedTradeSide = normalizedSide === 'buy' ? 'open_long' : 'open_short';
+
+      // Для лимитных ордеров получаем информацию о символе для правильного форматирования цены
+      let formattedPrice = price;
+      let formattedTpPrice = takeProfitPrice;
+      let formattedSlPrice = stopLossPrice;
+
+      const symbolInfo = await this.getSymbolInfo(symbol);
+      if (symbolInfo) {
+        if (orderType.toLowerCase() === 'limit' && price) {
+          formattedPrice = this.formatPrice(price, symbolInfo);
+        }
+        
+        if (takeProfitPrice) {
+          formattedTpPrice = this.formatPrice(takeProfitPrice, symbolInfo);
+        }
+        
+        if (stopLossPrice) {
+          formattedSlPrice = this.formatPrice(stopLossPrice, symbolInfo);
+        }
+      }
+
+      const params = {
+        symbol,
+        marginCoin: 'USDT',
+        size: size.toString(),
+        side: normalizedSide,
+        orderType: orderType.toLowerCase(),
+        timeInForceValue: 'normal',
+        tradeSide: formattedTradeSide,
+        marginMode: 'isolated',
+        productType: "USDT-FUTURES"
+      };
+
+      // Добавляем цену для лимитного ордера
+      if (orderType.toLowerCase() === 'limit' && formattedPrice) {
+        params.price = formattedPrice.toString();
+      }
+
+      // Добавляем TP/SL если они заданы
+      if (formattedTpPrice) {
+        params.presetTakeProfitPrice = formattedTpPrice.toString();
+      }
+      
+      if (formattedSlPrice) {
+        params.presetStopLossPrice = formattedSlPrice.toString();
+      }
+
+      if (this.debug) {
+        logger.info(`Размещение ордера с TP/SL: ${JSON.stringify(params)}`);
+      }
+      
+      const result = await this.submitOrder(params);
+      if (this.debug) {
+        logger.info(`Результат размещения ордера с TP/SL: ${JSON.stringify(result)}`);
+      }
+      return result;
+    } catch (error) {
+      logger.error(`Ошибка размещения ордера с TP/SL: ${error.message}`);
       
       if (error.response) {
         logger.error('Данные ответа:', JSON.stringify(error.response.data));
@@ -530,30 +622,13 @@ class BitGetClient {
     });
   }
   
-  // Метод для закрытия позиции по ID или по символу
-  async closePosition(symbol, marginCoin = 'USDT') {
-    logger.info(`Закрытие позиции по символу ${symbol}`);
-    return this.request('POST', '/api/v2/mix/position/close-position', {}, {
-      symbol: symbol,
-      marginCoin: marginCoin,
-      productType: "USDT-FUTURES",
-      marginMode: "isolated"
-    });
-  }
-  
-  // Алиас для closePosition для поддержки закрытия позиции по символу
-  async closePositionBySymbol(symbol, marginCoin = 'USDT') {
-    logger.info(`Закрытие позиции по символу ${symbol} через метод closePositionBySymbol`);
-    return this.closePosition(symbol, marginCoin);
-  }
-  
-  // Метод для установки стоп-лосса и тейк-профита
-  async setTpsl(symbol, positionSide, planType, triggerPrice, size) {
-    // Проверяем правильность параметра positionSide
-    if (!positionSide || (positionSide !== 'long' && positionSide !== 'short')) {
-      logger.warn(`Неверное значение positionSide: ${positionSide}. Должно быть 'long' или 'short'`);
+  // Исправленный метод для установки TP/SL
+  async setTpsl(symbol, holdSide, planType, triggerPrice, size) {
+    // Проверяем правильность параметра holdSide
+    if (!holdSide || (holdSide !== 'long' && holdSide !== 'short')) {
+      logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'long' или 'short'`);
       // Устанавливаем значение по умолчанию для предотвращения ошибки
-      positionSide = 'long';
+      holdSide = 'long';
     }
     
     // Получаем информацию о символе для правильного форматирования цены
@@ -570,8 +645,9 @@ class BitGetClient {
       marginCoin: 'USDT',
       planType, // "profit_plan" или "loss_plan"
       triggerPrice: formattedTriggerPrice.toString(),
+      triggerPriceType: "mark_price", // Обязательный параметр по документации
       size: size.toString(),
-      positionSide, // "long" или "short"
+      holdSide, // Корректный параметр: "long" или "short"
       productType: "USDT-FUTURES"
     };
     
@@ -581,23 +657,44 @@ class BitGetClient {
     
     return this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, requestBody);
   }
+
+  // Метод для модификации существующего TP/SL
+  async modifyTpsl(symbol, holdSide, planType, triggerPrice) {
+    const requestBody = {
+      symbol,
+      marginCoin: 'USDT',
+      planType, // "profit_plan" или "loss_plan"
+      triggerPrice: triggerPrice.toString(),
+      triggerPriceType: "mark_price",
+      holdSide, // "long" или "short"
+      productType: "USDT-FUTURES"
+    };
+    
+    if (this.debug) {
+      logger.info(`Модификация TP/SL: ${JSON.stringify(requestBody)}`);
+    }
+    
+    return this.request('POST', '/api/v2/mix/order/modify-tpsl-order', {}, requestBody);
+  }
   
-  // Метод для установки трейлинг-стопа
-  async setTrailingStop(symbol, positionSide, callbackRatio, size) {
-    // Для Bitget нужно преобразовать positionSide в side (buy/sell)
-    // long -> sell (для закрытия long позиции нужно sell)
-    // short -> buy (для закрытия short позиции нужно buy)
-    const side = positionSide.toLowerCase() === "long" ? "sell" : "buy";
+  // Исправленный метод для установки трейлинг-стопа
+  async setTrailingStop(symbol, holdSide, callbackRatio, size) {
+    // Определяем сторону для закрытия позиции
+    const side = holdSide.toLowerCase() === "long" ? "sell" : "buy";
+    
+    // Определяем правильное значение tradeSide
+    const tradeSide = holdSide.toLowerCase() === "long" ? "close_long" : "close_short";
     
     const params = {
       symbol,
       marginCoin: 'USDT',
       planType: "trailing_stop_plan",
-      callbackRatio: callbackRatio.toString(),
+      callbackRatio: callbackRatio.toString(), // Callbackratio должен быть строкой
       size: size.toString(),
       side: side,
-      triggerType: "market_price",
-      tradeSide: "close", // Важно указать close для закрытия позиции
+      triggerType: "mark_price",
+      timeInForceValue: "normal", // Обязательный параметр
+      tradeSide: tradeSide,
       productType: "USDT-FUTURES"
     };
     
