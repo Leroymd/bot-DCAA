@@ -40,8 +40,8 @@ class IndicatorManager {
 
   async loadHistoricalData(client, symbol) {
     try {
-      // Получаем исторические свечи с временным интервалом 15 минут
-      const candles = await client.getCandles(symbol, '15m', 200);
+      // Получаем исторические свечи с временным интервалом 3 минут
+      const candles = await client.getCandles(symbol, '3m', 200);
       
       if (!candles || !candles.data || candles.data.length === 0) {
         logger.warn('Не удалось загрузить исторические данные для ' + symbol);

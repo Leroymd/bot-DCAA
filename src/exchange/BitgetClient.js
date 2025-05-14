@@ -178,6 +178,35 @@ class BitGetClient {
     }
   }
 
+  // Добавлен метод getExchangeInfo для получения информации о доступных парах
+  async getExchangeInfo() {
+    try {
+      logger.info('Получение информации о доступных торговых парах...');
+      
+      const response = await this.request('GET', '/api/v2/mix/market/contracts', {
+        productType: "USDT-FUTURES"
+      });
+      
+      // Обработка ответа и преобразование к нужному формату
+      if (response && response.code === '00000' && response.data) {
+        logger.info(`Успешно получена информация о ${response.data.length} торговых парах`);
+        
+        if (this.debug) {
+          // В режиме отладки выводим первые несколько пар
+          logger.debug(`Пример данных: ${JSON.stringify(response.data.slice(0, 3))}`);
+        }
+        
+        return response;
+      } else {
+        logger.warn(`Ошибка при получении информации о торговых парах: ${response ? response.msg : 'пустой ответ'}`);
+        return { code: 'ERROR', msg: response ? response.msg : 'Empty response', data: [] };
+      }
+    } catch (error) {
+      logger.error(`Ошибка в getExchangeInfo: ${error.message}`);
+      return { code: 'ERROR', msg: error.message, data: [] };
+    }
+  }
+
   async getAccountAssets(marginCoin = 'USDT') {
     try {
       logger.info(`Запрос балансов для ${marginCoin}...`);
@@ -375,7 +404,7 @@ class BitGetClient {
     });
   }
 
-  // ИСПРАВЛЕНО: Метод для закрытия позиции лимитным ордером в одностороннем режиме
+  // Новый метод для закрытия позиции лимитным ордером
   async closePositionWithLimit(symbol, price = null) {
     try {
       if (!symbol) {
@@ -401,12 +430,12 @@ class BitGetClient {
         return { code: 'ERROR', msg: `No open position for ${symbol}` };
       }
       
-      // Определяем тип позиции (long или short)
+      // Определяем тип позиции
       const holdSide = position.holdSide.toLowerCase();
       
-      // !!! ИСПРАВЛЕНО: В one-way-mode для закрытия необходимо указать противоположный side
-      // и не указывать tradeSide (он требуется только для hedge-mode)
+      // Определяем параметры для ордера на закрытие
       const side = holdSide === 'long' ? 'sell' : 'buy';
+      const tradeSide = holdSide === 'long' ? 'close_long' : 'close_short';
       const size = position.available.toString();
       
       // Если цена не указана, получаем текущую рыночную цену
@@ -425,20 +454,19 @@ class BitGetClient {
             : (marketPrice * 1.005).toFixed(position.pricePrecision); // Чуть выше рынка для быстрого закрытия SHORT
       }
       
-      // !!! ИСПРАВЛЕНО: Формируем параметры для лимитного ордера в одностороннем режиме
+      // Формируем параметры для лимитного ордера
       const orderParams = {
         symbol,
         marginCoin: 'USDT',
         size,
         price: orderPrice.toString(),
-        side, // Противоположное направление текущей позиции
+        side,
         orderType: 'limit',
         timeInForceValue: 'normal',
-        reduceOnly: "YES", // Указываем, что ордер должен только сокращать позицию
+        tradeSide,
+        reduceOnly: "YES",
         productType: "USDT-FUTURES"
       };
-      
-      // !!! ВАЖНО: Не указываем tradeSide для one-way-mode
       
       // Отправляем ордер
       logger.info(`Отправка лимитного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
@@ -457,7 +485,7 @@ class BitGetClient {
     }
   }
 
-  // ИСПРАВЛЕНО: Метод для закрытия позиции по рыночной цене в одностороннем режиме
+  // Обновленный метод для закрытия позиции по рыночной цене
   async closePosition(symbol, marginCoin = 'USDT') {
     try {
       if (!symbol) {
@@ -483,43 +511,15 @@ class BitGetClient {
         return { code: 'WARNING', msg: `No open position for ${symbol}` };
       }
       
-      // !!! ИСПРАВЛЕНО: Вместо вызова специального эндпоинта create-position, используем обычный place-order 
-      // с противоположным side и параметром reduceOnly: "YES" для закрытия позиции
-      
-      // Определяем тип позиции
-      const holdSide = position.holdSide.toLowerCase();
-      
-      // Определяем противоположную сторону для закрытия
-      const side = holdSide === 'long' ? 'sell' : 'buy';
-      
-      // Получаем размер позиции
-      const size = position.available.toString();
-      
-      // Формируем параметры для рыночного ордера
-      const orderParams = {
+      // Корректные параметры для закрытия позиции по API Bitget
+      const params = {
         symbol,
         marginCoin,
-        size,
-        side, // Противоположное направление текущей позиции
-        orderType: 'market', // Рыночный ордер для быстрого исполнения
-        timeInForceValue: 'normal',
-        reduceOnly: "YES", // Указываем, что ордер должен только сокращать позицию
         productType: "USDT-FUTURES"
       };
       
-      // !!! ВАЖНО: Не указываем tradeSide для one-way-mode
-      
-      // Отправляем ордер
-      logger.info(`Отправка рыночного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
-      const response = await this.submitOrder(orderParams);
-      
-      if (response && response.code === '00000') {
-        logger.info(`Позиция ${symbol} успешно закрыта рыночным ордером: ${JSON.stringify(response.data)}`);
-      } else {
-        logger.warn(`Ошибка при закрытии позиции ${symbol} рыночным ордером: ${response ? response.msg : 'Unknown error'}`);
-      }
-      
-      return response;
+      // Отправляем запрос на закрытие позиции
+      return this.request('POST', '/api/v2/mix/position/close-position', {}, params);
     } catch (error) {
       logger.error(`Ошибка при закрытии позиции ${symbol}: ${error.message}`);
       return { code: 'ERROR', msg: error.message };
@@ -670,17 +670,14 @@ class BitGetClient {
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal', // Обязательный параметр согласно документации
+        tradeSide: formattedTradeSide,
+        marginMode: 'isolated',
         productType: "USDT-FUTURES"
       };
 
-      // !!! ИСПРАВЛЕНО: Для one-way-mode не указываем tradeSide, только для hedge-mode
-      // Если это hedge-mode (мы используем tradeSide для открытия/закрытия)
-      if (tradeSide !== "open" && tradeSide !== "close") {
-        params.tradeSide = formattedTradeSide;
-      }
-
       if (reduceOnly === true) {
-        // При reduceOnly мы закрываем позицию
+        // При reduceOnly всегда используем close_long или close_short
+        params.tradeSide = normalizedSide === 'buy' ? 'close_short' : 'close_long';
         params.reduceOnly = "YES";
       }
 
@@ -723,6 +720,9 @@ class BitGetClient {
     }
 
     try {
+      // Определяем tradeSide на основе side
+      const formattedTradeSide = normalizedSide === 'buy' ? 'open_long' : 'open_short';
+
       // Для лимитных ордеров получаем информацию о символе для правильного форматирования цены
       let formattedPrice = price;
       let formattedTpPrice = takeProfitPrice;
@@ -750,6 +750,8 @@ class BitGetClient {
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal',
+        tradeSide: formattedTradeSide,
+        marginMode: 'isolated',
         productType: "USDT-FUTURES"
       };
 
@@ -798,6 +800,55 @@ class BitGetClient {
     });
   }
   
+  // Добавлен метод для получения исторических свечей
+  async getCandles(symbol, granularity = '3m', limit = 100, startTime = null, endTime = null) {
+    try {
+      logger.info(`Получение свечей для ${symbol}, интервал: ${granularity}, лимит: ${limit}`);
+      
+      const params = {
+        symbol,
+        granularity,
+        limit: limit.toString(),
+        productType: "USDT-FUTURES"
+      };
+      
+      // Добавляем startTime и endTime, если они указаны
+      if (startTime) {
+        params.startTime = startTime.toString();
+      }
+      
+      if (endTime) {
+        params.endTime = endTime.toString();
+      }
+      
+      const response = await this.request('GET', '/api/v2/mix/market/candles', params);
+      
+      if (!response || !response.data) {
+        logger.warn(`Пустой ответ или ошибка при получении свечей для ${symbol}`);
+        return { code: 'ERROR', msg: 'Empty response', data: [] };
+      }
+      
+      if (response.code && response.code !== '00000') {
+        logger.warn(`API ошибка при получении свечей: ${response.code} - ${response.msg}`);
+        return response;
+      }
+      
+      // Обработка и форматирование данных свечей
+      if (this.debug) {
+        logger.info(`Получено ${response.data.length} свечей для ${symbol}`);
+        
+        if (response.data.length > 0) {
+          logger.debug(`Пример свечи: ${JSON.stringify(response.data[0])}`);
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      logger.error(`Ошибка при получении свечей для ${symbol}: ${error.message}`);
+      return { code: 'ERROR', msg: error.message, data: [] };
+    }
+  }
+  
   // Исправленный метод для установки TP/SL
   async setTpsl(symbol, holdSide, planType, triggerPrice, size) {
     // Проверяем правильность параметра holdSide
@@ -816,8 +867,6 @@ class BitGetClient {
       logger.info(`Отформатированная цена триггера для ${symbol}: ${formattedTriggerPrice} (исходная: ${triggerPrice})`);
     }
   
-    // Согласно документации https://www.bitget.com/api-doc/contract/plan/Place-Tpsl-Order
-    // мы исключаем любые ненужные параметры
     const requestBody = {
       symbol,
       marginCoin: 'USDT',
@@ -838,8 +887,6 @@ class BitGetClient {
 
   // Метод для модификации существующего TP/SL
   async modifyTpsl(symbol, holdSide, planType, triggerPrice) {
-    // ИСПРАВЛЕНО: Согласно документации https://www.bitget.com/api-doc/contract/plan/Modify-Tpsl-Order
-    // параметр tradeSide не требуется для эндпоинта modify-tpsl-order
     const requestBody = {
       symbol,
       marginCoin: 'USDT',
@@ -883,6 +930,27 @@ class BitGetClient {
     }
     
     return this.request('POST', '/api/v2/mix/order/place-plan-order', {}, params);
+  }
+
+  // Метод для получения символов по фильтру USDT
+  async getUsdtFuturesSymbols() {
+    try {
+      const response = await this.getExchangeInfo();
+      
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        logger.warn('Не удалось получить список символов');
+        return [];
+      }
+      
+      // Фильтруем символы только с USDT
+      const usdtSymbols = response.data.filter(item => item.quoteCoin === 'USDT');
+      
+      logger.info(`Найдено ${usdtSymbols.length} символов с USDT`);
+      return usdtSymbols;
+    } catch (error) {
+      logger.error(`Ошибка при получении списка символов: ${error.message}`);
+      return [];
+    }
   }
 }
 
