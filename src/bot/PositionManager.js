@@ -228,7 +228,7 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  // Исправленный метод закрытия позиции
+  // Исправленный метод закрытия позиции по ID
   async closePosition(positionId, percentage = 100) {
     try {
       percentage = percentage || 100;
@@ -242,35 +242,78 @@ class PositionManager extends EventEmitter {
         return false;
       }
       
+      // Получаем подробную информацию о позиции для закрытия
+      const positionDetails = await this.client.getPositionDetails(position.symbol);
+      if (!positionDetails || !positionDetails.data) {
+        logger.error(`Не удалось получить детали позиции для ${position.symbol}`);
+        return false;
+      }
+      
+      const positionData = positionDetails.data;
+      
       logger.info(`Закрытие позиции ${position.symbol} ${position.type}, ID: ${positionId}`);
       
       try {
-        // Используем обновленный метод closePosition из BitgetClient
-        const response = await this.client.closePosition(position.symbol);
+        // Используем лимитное закрытие позиции
+        // Получаем текущую цену для создания лимитного ордера
+        const ticker = await this.client.getTicker(position.symbol);
+        if (!ticker || !ticker.data || !ticker.data.last) {
+          logger.error(`Не удалось получить текущую цену для ${position.symbol}`);
+          return false;
+        }
+        
+        const currentPrice = parseFloat(ticker.data.last);
+        
+        // Определяем цену лимитного ордера (с небольшим отступом для быстрого исполнения)
+        const priceOffset = position.type === 'LONG' ? 0.995 : 1.005; // 0.5% отступ
+        const limitPrice = (currentPrice * priceOffset).toFixed(4);
+        
+        // Закрываем позицию лимитным ордером
+        const response = await this.client.closePositionWithLimit(position.symbol, limitPrice);
         
         if (response && response.code === '00000') {
-          logger.info(`Позиция ${position.symbol} ${position.type} успешно закрыта`);
+          logger.info(`Позиция ${position.symbol} ${position.type} успешно закрыта лимитным ордером`);
           
-          // Получаем текущую цену для расчета P&L
-          const ticker = await this.client.getTicker(position.symbol);
-          const currentPrice = ticker && ticker.data && ticker.data.last ? 
-            parseFloat(ticker.data.last) : position.currentPrice;
-          
-          // Обновляем историю
+          // Обновляем историю позиций
           this.updatePositionHistory(position, 'closed', currentPrice);
           
           // Удаляем позицию из списка открытых
           this.openPositions = this.openPositions.filter(p => p.id !== positionId);
           
+          // Отправляем событие о закрытии позиции
           this.emit('position_closed', { 
             positionId: positionId, 
-            percentage: 100
+            percentage: 100,
+            price: currentPrice
           });
           
           return true;
         } else {
-          logger.warn(`Не удалось закрыть позицию ${position.symbol} ${position.type}: ${response ? response.msg : 'Нет ответа от API'}`);
-          return false;
+          logger.warn(`Не удалось закрыть позицию ${position.symbol} ${position.type} лимитным ордером: ${response ? response.msg : 'Нет ответа от API'}`);
+          
+          // Если закрытие лимитным ордером не удалось, пробуем закрыть позицию по рынку
+          logger.info(`Пробуем закрыть позицию ${position.symbol} по рыночной цене...`);
+          const marketResponse = await this.client.closePosition(position.symbol);
+          
+          if (marketResponse && marketResponse.code === '00000') {
+            logger.info(`Позиция ${position.symbol} ${position.type} успешно закрыта по рыночной цене`);
+            
+            // Обновляем историю
+            this.updatePositionHistory(position, 'closed', currentPrice);
+            
+            // Удаляем позицию из списка открытых
+            this.openPositions = this.openPositions.filter(p => p.id !== positionId);
+            
+            this.emit('position_closed', { 
+              positionId: positionId, 
+              percentage: 100
+            });
+            
+            return true;
+          } else {
+            logger.error(`Не удалось закрыть позицию ${position.symbol} ${position.type} ни лимитным, ни рыночным ордером`);
+            return false;
+          }
         }
       } catch (closeError) {
         logger.error(`Ошибка при закрытии позиции ${position.symbol} ${position.type}: ${closeError.message}`);
@@ -282,7 +325,7 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  // Новый метод для закрытия позиции по символу (без необходимости знать ID)
+  // Метод для закрытия позиции по символу
   async closePositionBySymbol(symbol) {
     try {
       if (!symbol) {
@@ -303,17 +346,27 @@ class PositionManager extends EventEmitter {
         return false;
       }
       
+      // Получаем текущую цену для создания лимитного ордера
+      const ticker = await this.client.getTicker(symbol);
+      if (!ticker || !ticker.data || !ticker.data.last) {
+        logger.error(`Не удалось получить текущую цену для ${symbol}`);
+        return false;
+      }
+      
+      const currentPrice = parseFloat(ticker.data.last);
+      
+      // Определяем цену лимитного ордера (с небольшим отступом для быстрого исполнения)
+      const priceOffset = position.type === 'LONG' ? 0.995 : 1.005; // 0.5% отступ
+      const limitPrice = (currentPrice * priceOffset).toFixed(4);
+      
+      logger.info(`Закрытие позиции ${symbol} ${position.type} лимитным ордером по цене ${limitPrice}`);
+      
       try {
-        // Используем обновленный метод closePosition из BitgetClient
-        const response = await this.client.closePosition(symbol);
+        // Пробуем закрыть позицию лимитным ордером
+        const response = await this.client.closePositionWithLimit(symbol, limitPrice);
         
         if (response && response.code === '00000') {
-          logger.info(`Позиция ${symbol} успешно закрыта`);
-          
-          // Получаем текущую цену для расчета P&L
-          const ticker = await this.client.getTicker(symbol);
-          const currentPrice = ticker && ticker.data && ticker.data.last ? 
-            parseFloat(ticker.data.last) : position.currentPrice;
+          logger.info(`Позиция ${symbol} успешно закрыта лимитным ордером`);
           
           // Обновляем историю
           this.updatePositionHistory(position, 'closed', currentPrice);
@@ -329,8 +382,32 @@ class PositionManager extends EventEmitter {
           
           return true;
         } else {
-          logger.warn(`Не удалось закрыть позицию ${symbol}: ${response ? response.msg : 'Нет ответа от API'}`);
-          return false;
+          logger.warn(`Не удалось закрыть позицию ${symbol} лимитным ордером: ${response ? response.msg : 'Нет ответа от API'}`);
+          
+          // Если закрытие лимитным ордером не удалось, пробуем закрыть по рынку
+          logger.info(`Пробуем закрыть позицию ${symbol} по рыночной цене...`);
+          const marketResponse = await this.client.closePosition(symbol);
+          
+          if (marketResponse && marketResponse.code === '00000') {
+            logger.info(`Позиция ${symbol} успешно закрыта по рыночной цене`);
+            
+            // Обновляем историю
+            this.updatePositionHistory(position, 'closed', currentPrice);
+            
+            // Удаляем позицию из списка открытых
+            this.openPositions = this.openPositions.filter(p => p.symbol !== symbol);
+            
+            this.emit('position_closed', { 
+              positionId: position.id, 
+              symbol: symbol,
+              percentage: 100
+            });
+            
+            return true;
+          } else {
+            logger.error(`Не удалось закрыть позицию ${symbol} ни лимитным, ни рыночным ордером`);
+            return false;
+          }
         }
       } catch (closeError) {
         logger.error(`Ошибка при закрытии позиции ${symbol}: ${closeError.message}`);

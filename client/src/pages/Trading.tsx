@@ -1,4 +1,4 @@
-// client/src/pages/Trading.tsx - исправленная версия
+// client/src/pages/Trading.tsx - обновленная версия
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, X, Settings } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -6,10 +6,9 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { api } from '../api/apiClient';
 import { TradingPair, OrderFormData } from '../types';
 import { useAppContext } from '../contexts/AppContext';
-import axios from 'axios';
 
 const Trading: React.FC = () => {
-  const { botStatus, loading: botLoading, error: botError } = useAppContext();
+  const { botStatus, loading: botLoading, error: botError, updateBotStatus } = useAppContext();
   
   const [activePositions, setActivePositions] = useState<TradingPair[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -25,6 +24,7 @@ const Trading: React.FC = () => {
   });
   const [showTpSlFields, setShowTpSlFields] = useState<boolean>(false);
   const [positionSettingsOpen, setPositionSettingsOpen] = useState<string | null>(null);
+  const [closingPositions, setClosingPositions] = useState<{ [key: string]: boolean }>({});
   
   useEffect(() => {
     const fetchPositions = async () => {
@@ -52,13 +52,16 @@ const Trading: React.FC = () => {
   
   const closePosition = async (positionId: string) => {
     try {
-      // Find the position to get its symbol
+      // Найдем позицию для получения её символа
       const position = activePositions.find(position => position.id === positionId);
       if (!position) {
         setError('Не удалось найти позицию для закрытия');
         return;
       }
 
+      // Отмечаем позицию как закрывающуюся для отображения индикатора загрузки
+      setClosingPositions(prev => ({ ...prev, [positionId]: true }));
+      
       // Логируем данные позиции для отладки
       console.log(`Закрытие позиции: ID=${positionId}, символ=${position.pair}`);
       
@@ -66,15 +69,26 @@ const Trading: React.FC = () => {
       const response = await api.position.close(positionId, position.pair);
       
       if (response.success) {
-        // Обновляем список позиций
-        const updatedPositions = activePositions.filter(position => position.id !== positionId);
-        setActivePositions(updatedPositions);
+        // Обновляем список позиций и статус бота
+        await updateBotStatus();
+        
+        // Получаем обновленный список торговых пар
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
+        setActivePositions(positions);
       } else {
         setError(response.message || 'Не удалось закрыть позицию');
       }
     } catch (err) {
       console.error('Error closing position:', err);
       setError('Ошибка при закрытии позиции');
+    } finally {
+      // Убираем индикатор загрузки
+      setClosingPositions(prev => {
+        const updated = { ...prev };
+        delete updated[positionId];
+        return updated;
+      });
     }
   };
   
@@ -90,6 +104,8 @@ const Trading: React.FC = () => {
     e.preventDefault();
     
     try {
+      setLoading(true);
+      
       // Проверяем, нужно ли отправлять TP/SL
       let orderData = { ...orderFormData };
       
@@ -117,9 +133,12 @@ const Trading: React.FC = () => {
         });
         setShowTpSlFields(false);
         
-        // Обновляем список позиций
-        const pairsData = await api.pairs.getActive();
-        const positions = pairsData.filter(pair => pair.status === 'active');
+        // Обновляем статус бота и список позиций
+        await updateBotStatus();
+        
+        // Получаем обновленный список торговых пар
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
         setActivePositions(positions);
       } else {
         setError(response.message || 'Не удалось открыть позицию');
@@ -127,6 +146,8 @@ const Trading: React.FC = () => {
     } catch (err) {
       console.error('Error opening position:', err);
       setError('Ошибка при открытии позиции');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -152,8 +173,8 @@ const Trading: React.FC = () => {
       if (response.success) {
         setPositionSettingsOpen(null);
         // Обновляем список позиций
-        const pairsData = await api.pairs.getActive();
-        const positions = pairsData.filter(pair => pair.status === 'active');
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
         setActivePositions(positions);
       } else {
         setError(response.message || 'Не удалось установить TP/SL');
@@ -185,8 +206,8 @@ const Trading: React.FC = () => {
       if (response.success) {
         setPositionSettingsOpen(null);
         // Обновляем список позиций
-        const pairsData = await api.pairs.getActive();
-        const positions = pairsData.filter(pair => pair.status === 'active');
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
         setActivePositions(positions);
       } else {
         setError(response.message || 'Не удалось установить трейлинг-стоп');
@@ -199,7 +220,7 @@ const Trading: React.FC = () => {
   
   const currentError = botError || error;
   
-  if (loading || botLoading) {
+  if (loading && botLoading) {
     return <LoadingSpinner message="Загрузка данных..." />;
   }
   
@@ -348,8 +369,9 @@ const Trading: React.FC = () => {
                   <button 
                     type="submit" 
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md"
+                    disabled={loading}
                   >
-                    Открыть позицию
+                    {loading ? 'Открытие...' : 'Открыть позицию'}
                   </button>
                 </div>
               </form>
@@ -391,10 +413,16 @@ const Trading: React.FC = () => {
                       <td className="p-4">{position.time || '00:00'}</td>
                       <td className="p-4 flex items-center space-x-2">
                         <button 
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-md text-sm"
+                          className={`px-3 py-1 ${closingPositions[position.id] ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-700'} rounded-md text-sm flex items-center`}
                           onClick={() => closePosition(position.id)}
+                          disabled={closingPositions[position.id]}
                         >
-                          Закрыть
+                          {closingPositions[position.id] ? (
+                            <>
+                              <span className="animate-spin h-4 w-4 mr-1 border-t-2 border-b-2 border-white rounded-full"></span>
+                              Закрытие...
+                            </>
+                          ) : 'Закрыть'}
                         </button>
                         <button 
                           className="p-1 bg-gray-700 hover:bg-gray-600 rounded-md"

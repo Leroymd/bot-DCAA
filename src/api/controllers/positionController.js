@@ -143,6 +143,11 @@ exports.closePosition = async function(req, res) {
     let positionId = req.body.positionId;
     let symbol = req.body.symbol || req.body.pair;
     
+    // Если positionId передан в URL параметрах, используем его
+    if (req.params && req.params.positionId) {
+      positionId = req.params.positionId;
+    }
+    
     // Проверка на случай других вариантов именования параметра
     if (!positionId && req.body.id) {
       positionId = req.body.id;
@@ -179,6 +184,9 @@ exports.closePosition = async function(req, res) {
     
     // Обновляем список открытых позиций
     await tradingBot.positionManager.updateOpenPositions();
+    
+    // Обновляем статус бота
+    tradingBot.updateStatus();
     
     return res.json({
       success: true,
@@ -220,7 +228,7 @@ exports.getActivePositions = async function(req, res) {
   }
 };
 
-// Новый метод для установки TP/SL
+// Метод для установки TP/SL
 exports.setTpsl = async function(req, res) {
   try {
     const tradingBot = getBot();
@@ -278,7 +286,7 @@ exports.setTpsl = async function(req, res) {
   }
 };
 
-// Новый метод для установки трейлинг-стопа
+// Метод для установки трейлинг-стопа
 exports.setTrailingStop = async function(req, res) {
   try {
     const tradingBot = getBot();
