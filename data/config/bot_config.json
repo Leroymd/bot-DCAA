@@ -4,9 +4,7 @@
   "passphrase": "Workinday13",
   "demo": false,
   "strategy": "fractal",
-  "tradingPairs": [
-    "BTCUSDT"
-  ],
+  "tradingPairs": [],
   "maxTradingPairs": 5,
   "pacLength": 34,
   "fastEMAlength": 89,

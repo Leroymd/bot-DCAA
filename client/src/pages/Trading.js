@@ -1,9 +1,14 @@
-// client/src/pages/Trading.js
+// client/src/pages/Trading.js - обновленная JavaScript версия
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { AlertCircle, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { AlertCircle, ArrowUp, ArrowDown, X, Settings } from 'lucide-react';
+import { Layout } from '../components/Layout';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { api } from '../api/apiClient';
+import { useAppContext } from '../contexts/AppContext';
 
 const Trading = () => {
+  const { botStatus, loading: botLoading, error: botError, updateBotStatus } = useAppContext();
+  
   const [activePositions, setActivePositions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,19 +17,22 @@ const Trading = () => {
     symbol: '',
     type: 'LONG',
     size: '',
-    leverage: 20
+    leverage: 20,
+    takeProfitPrice: '',
+    stopLossPrice: ''
   });
+  const [showTpSlFields, setShowTpSlFields] = useState(false);
+  const [positionSettingsOpen, setPositionSettingsOpen] = useState(null);
+  const [closingPositions, setClosingPositions] = useState({});
   
   useEffect(() => {
     const fetchPositions = async () => {
       try {
-        const response = await axios.get('/api/pairs/active');
+        const data = await api.pairs.getActive();
         
-        if (response.data) {
-          // Фильтрация только активных позиций
-          const positions = response.data.filter(pair => pair.status === 'active');
-          setActivePositions(positions);
-        }
+        // Фильтрация только активных позиций
+        const positions = data.filter(pair => pair.status === 'active');
+        setActivePositions(positions);
         
         setLoading(false);
       } catch (err) {
@@ -43,40 +51,51 @@ const Trading = () => {
   
   const closePosition = async (positionId) => {
     try {
-      // Find the position to get its symbol
+      // Найдем позицию для получения её символа
       const position = activePositions.find(position => position.id === positionId);
       if (!position) {
         setError('Не удалось найти позицию для закрытия');
         return;
       }
 
+      // Отмечаем позицию как закрывающуюся для отображения индикатора загрузки
+      setClosingPositions(prev => ({ ...prev, [positionId]: true }));
+      
       // Логируем данные позиции для отладки
       console.log(`Закрытие позиции: ID=${positionId}, символ=${position.pair}`);
       
-      // Отправляем запрос на закрытие позиции с ID и символом
-      const response = await axios.post('/api/position/close', {
-        positionId: positionId,
-        symbol: position.pair
-      });
+      // Отправляем запрос на закрытие позиции с ID и символом пары
+      const response = await api.position.close(positionId, position.pair);
       
-      if (response.data.success) {
-        // Обновляем список позиций
-        const updatedPositions = activePositions.filter(position => position.id !== positionId);
-        setActivePositions(updatedPositions);
+      if (response.success) {
+        // Обновляем список позиций и статус бота
+        await updateBotStatus();
+        
+        // Получаем обновленный список торговых пар
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
+        setActivePositions(positions);
       } else {
-        setError(response.data.message || 'Не удалось закрыть позицию');
+        setError(response.message || 'Не удалось закрыть позицию');
       }
     } catch (err) {
       console.error('Error closing position:', err);
       setError('Ошибка при закрытии позиции');
+    } finally {
+      // Убираем индикатор загрузки
+      setClosingPositions(prev => {
+        const updated = { ...prev };
+        delete updated[positionId];
+        return updated;
+      });
     }
   };
   
   const handleFormChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setOrderFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'leverage' ? parseInt(value, 10) : value
     }));
   };
   
@@ -84,46 +103,128 @@ const Trading = () => {
     e.preventDefault();
     
     try {
-      const response = await axios.post('/api/position/open', orderFormData);
+      setLoading(true);
       
-      if (response.data.success) {
+      // Проверяем, нужно ли отправлять TP/SL
+      let orderData = { ...orderFormData };
+      
+      // Если TP/SL не указаны или не показаны, удаляем их из запроса
+      if (!showTpSlFields || !orderData.takeProfitPrice) {
+        delete orderData.takeProfitPrice;
+      }
+      
+      if (!showTpSlFields || !orderData.stopLossPrice) {
+        delete orderData.stopLossPrice;
+      }
+      
+      const response = await api.position.open(orderData);
+      
+      if (response.success) {
         // Сбрасываем форму и обновляем список позиций
         setOpenOrderForm(false);
         setOrderFormData({
           symbol: '',
           type: 'LONG',
           size: '',
-          leverage: 20
+          leverage: 20,
+          takeProfitPrice: '',
+          stopLossPrice: ''
         });
+        setShowTpSlFields(false);
         
-        // Обновляем список позиций
-        const positionsResponse = await axios.get('/api/pairs/active');
-        if (positionsResponse.data) {
-          const positions = positionsResponse.data.filter(pair => pair.status === 'active');
-          setActivePositions(positions);
-        }
+        // Обновляем статус бота и список позиций
+        await updateBotStatus();
+        
+        // Получаем обновленный список торговых пар
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
+        setActivePositions(positions);
       } else {
-        setError(response.data.message || 'Не удалось открыть позицию');
+        setError(response.message || 'Не удалось открыть позицию');
       }
     } catch (err) {
       console.error('Error opening position:', err);
       setError('Ошибка при открытии позиции');
+    } finally {
+      setLoading(false);
     }
   };
   
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <div className="text-center">
-          <div className="spinner"></div>
-          <p className="mt-4 text-lg text-gray-300">Загрузка данных...</p>
-        </div>
-      </div>
-    );
+  // Функция для настройки TP/SL для существующей позиции
+  const setTpSl = async (positionId, takeProfitPrice, stopLossPrice) => {
+    try {
+      const position = activePositions.find(position => position.id === positionId);
+      if (!position) {
+        setError('Не удалось найти позицию');
+        return;
+      }
+      
+      // Тип позиции определяет holdSide для API
+      const holdSide = position.position === 'LONG' ? 'long' : 'short';
+      
+      const response = await api.position.setTpsl(
+        position.pair,
+        holdSide,
+        takeProfitPrice ? parseFloat(takeProfitPrice) : undefined,
+        stopLossPrice ? parseFloat(stopLossPrice) : undefined
+      );
+      
+      if (response.success) {
+        setPositionSettingsOpen(null);
+        // Обновляем список позиций
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
+        setActivePositions(positions);
+      } else {
+        setError(response.message || 'Не удалось установить TP/SL');
+      }
+    } catch (err) {
+      console.error('Error setting TP/SL:', err);
+      setError('Ошибка при установке TP/SL');
+    }
+  };
+  
+  // Функция для установки трейлинг-стопа
+  const setTrailingStop = async (positionId, callbackRatio) => {
+    try {
+      const position = activePositions.find(position => position.id === positionId);
+      if (!position) {
+        setError('Не удалось найти позицию');
+        return;
+      }
+      
+      // Тип позиции определяет holdSide для API
+      const holdSide = position.position === 'LONG' ? 'long' : 'short';
+      
+      const response = await api.position.setTrailingStop(
+        position.pair,
+        holdSide,
+        parseFloat(callbackRatio)
+      );
+      
+      if (response.success) {
+        setPositionSettingsOpen(null);
+        // Обновляем список позиций
+        const data = await api.pairs.getActive();
+        const positions = data.filter(pair => pair.status === 'active');
+        setActivePositions(positions);
+      } else {
+        setError(response.message || 'Не удалось установить трейлинг-стоп');
+      }
+    } catch (err) {
+      console.error('Error setting trailing stop:', err);
+      setError('Ошибка при установке трейлинг-стопа');
+    }
+  };
+  
+  const currentError = botError || error;
+  
+  if (loading && botLoading) {
+    return <LoadingSpinner message="Загрузка данных..." />;
   }
   
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
+    <Layout botStatus={botStatus}>
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Торговля</h1>
@@ -135,11 +236,11 @@ const Trading = () => {
           </button>
         </div>
         
-        {error && (
+        {currentError && (
           <div className="bg-red-800 text-white p-4 rounded-lg mb-6 flex justify-between items-center">
             <div className="flex items-center">
               <AlertCircle className="w-5 h-5 mr-2" />
-              {error}
+              {currentError}
             </div>
             <button onClick={() => setError(null)}>
               <X className="w-5 h-5" />
@@ -214,6 +315,48 @@ const Trading = () => {
                   </select>
                 </div>
                 
+                <div className="mb-4">
+                  <div className="flex items-center mb-2">
+                    <input 
+                      type="checkbox" 
+                      id="showTpSl" 
+                      checked={showTpSlFields}
+                      onChange={(e) => setShowTpSlFields(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="showTpSl" className="text-sm text-gray-400">
+                      Установить Take Profit и Stop Loss
+                    </label>
+                  </div>
+                  
+                  {showTpSlFields && (
+                    <div className="space-y-3 mt-2">
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Take Profit (Цена)</label>
+                        <input 
+                          type="number" 
+                          name="takeProfitPrice" 
+                          value={orderFormData.takeProfitPrice} 
+                          onChange={handleFormChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2"
+                          placeholder="Цена для Take Profit"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Stop Loss (Цена)</label>
+                        <input 
+                          type="number" 
+                          name="stopLossPrice" 
+                          value={orderFormData.stopLossPrice} 
+                          onChange={handleFormChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2"
+                          placeholder="Цена для Stop Loss"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
                 <div className="flex justify-end space-x-3">
                   <button 
                     type="button" 
@@ -225,8 +368,9 @@ const Trading = () => {
                   <button 
                     type="submit" 
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md"
+                    disabled={loading}
                   >
-                    Открыть позицию
+                    {loading ? 'Открытие...' : 'Открыть позицию'}
                   </button>
                 </div>
               </form>
@@ -251,33 +395,120 @@ const Trading = () => {
             <tbody>
               {activePositions.length > 0 ? (
                 activePositions.map((position, index) => (
-                  <tr key={index} className="border-t border-gray-700">
-                    <td className="p-4 font-medium">{position.pair}</td>
-                    <td className="p-4">
-                      <span className={`flex items-center ${position.position === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
-                        {position.position === 'LONG' ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
-                        {position.position}
-                      </span>
-                    </td>
-                    <td className="p-4">{position.entryPrice || 'N/A'}</td>
-                    <td className="p-4">{position.currentPrice || 'N/A'}</td>
-                    <td className={`p-4 ${position.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {position.profit >= 0 ? '+' : ''}{position.profit?.toFixed(2) || '0.00'}%
-                    </td>
-                    <td className="p-4">{position.time || '00:00'}</td>
-                    <td className="p-4">
-                      <button 
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-md text-sm"
-                        onClick={() => closePosition(position.id)}
-                      >
-                        Закрыть
-                      </button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={index}>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-4 font-medium">{position.pair}</td>
+                      <td className="p-4">
+                        <span className={`flex items-center ${position.position === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                          {position.position === 'LONG' ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
+                          {position.position}
+                        </span>
+                      </td>
+                      <td className="p-4">{position.entryPrice || 'N/A'}</td>
+                      <td className="p-4">{position.currentPrice || 'N/A'}</td>
+                      <td className={`p-4 ${position.profit && position.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {position.profit && position.profit >= 0 ? '+' : ''}{position.profit?.toFixed(2) || '0.00'}%
+                      </td>
+                      <td className="p-4">{position.time || '00:00'}</td>
+                      <td className="p-4 flex items-center space-x-2">
+                        <button 
+                          className={`px-3 py-1 ${closingPositions[position.id] ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-700'} rounded-md text-sm flex items-center`}
+                          onClick={() => closePosition(position.id)}
+                          disabled={closingPositions[position.id]}
+                        >
+                          {closingPositions[position.id] ? (
+                            <>
+                              <span className="animate-spin h-4 w-4 mr-1 border-t-2 border-b-2 border-white rounded-full"></span>
+                              Закрытие...
+                            </>
+                          ) : 'Закрыть'}
+                        </button>
+                        <button 
+                          className="p-1 bg-gray-700 hover:bg-gray-600 rounded-md"
+                          onClick={() => setPositionSettingsOpen(position.id === positionSettingsOpen ? null : position.id)}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                    {positionSettingsOpen === position.id && (
+                      <tr className="bg-gray-700">
+                        <td colSpan={7} className="p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* TP/SL settings */}
+                            <div className="bg-gray-800 p-3 rounded">
+                              <h4 className="font-medium mb-2">Установить TP/SL</h4>
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">Take Profit (Цена)</label>
+                                  <input 
+                                    type="number"
+                                    id={`tp-${position.id}`}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm"
+                                    placeholder="Цена для Take Profit"
+                                    defaultValue=""
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">Stop Loss (Цена)</label>
+                                  <input 
+                                    type="number"
+                                    id={`sl-${position.id}`}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm"
+                                    placeholder="Цена для Stop Loss"
+                                    defaultValue=""
+                                  />
+                                </div>
+                                <button 
+                                  className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm mt-2"
+                                  onClick={() => {
+                                    const tpInput = document.getElementById(`tp-${position.id}`);
+                                    const slInput = document.getElementById(`sl-${position.id}`);
+                                    setTpSl(position.id, tpInput.value, slInput.value);
+                                  }}
+                                >
+                                  Установить
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Trailing Stop settings */}
+                            <div className="bg-gray-800 p-3 rounded">
+                              <h4 className="font-medium mb-2">Трейлинг-стоп</h4>
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">Callback Ratio (%)</label>
+                                  <input 
+                                    type="number"
+                                    id={`ts-${position.id}`}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm"
+                                    placeholder="Например, 2"
+                                    defaultValue="2"
+                                    min="0.1"
+                                    max="5"
+                                    step="0.1"
+                                  />
+                                </div>
+                                <button 
+                                  className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm mt-2"
+                                  onClick={() => {
+                                    const tsInput = document.getElementById(`ts-${position.id}`);
+                                    setTrailingStop(position.id, tsInput.value);
+                                  }}
+                                >
+                                  Установить трейлинг-стоп
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="p-4 text-center text-gray-400">
+                  <td colSpan={7} className="p-4 text-center text-gray-400">
                     Нет активных позиций
                   </td>
                 </tr>
@@ -286,7 +517,7 @@ const Trading = () => {
           </table>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

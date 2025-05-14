@@ -1,4 +1,4 @@
-// client/src/pages/Dashboard.tsx - улучшенная версия с возможностью удаления пар
+// client/src/pages/Dashboard.js - обновленная JavaScript версия
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Bell, Settings, TrendingUp, Activity, DollarSign, Clock, 
@@ -9,16 +9,17 @@ import { api } from '../api/apiClient';
 import { useAppContext } from '../contexts/AppContext';
 import { Layout } from '../components/Layout';
 
-const Dashboard: React.FC = () => {
+const Dashboard = () => {
   const { botStatus, loading: botLoading, error: botError, updateBotStatus } = useAppContext();
   
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tradingPairs, setTradingPairs] = useState<any[]>([]);
-  const [topPairs, setTopPairs] = useState<any[]>([]);
-  const [recentSignals, setRecentSignals] = useState<any[]>([]);
-  const [pnlData, setPnlData] = useState<any[]>([]);
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [tradingPairs, setTradingPairs] = useState([]);
+  const [topPairs, setTopPairs] = useState([]);
+  const [recentSignals, setRecentSignals] = useState([]);
+  const [pnlData, setPnlData] = useState([]);
+  const [confirmRemove, setConfirmRemove] = useState(null);
+  const [closingPositions, setClosingPositions] = useState({});
   
   // Загрузка данных при монтировании компонента
   useEffect(() => {
@@ -95,7 +96,7 @@ const Dashboard: React.FC = () => {
   };
   
   // Обработчик выбора пары для торговли
-  const selectPairForTrading = async (pair: string) => {
+  const selectPairForTrading = async (pair) => {
     try {
       const response = await api.pairs.select(pair);
       
@@ -112,8 +113,8 @@ const Dashboard: React.FC = () => {
     }
   };
   
-  // Новый обработчик для удаления пары
-  const removePairFromTrading = async (pair: string) => {
+  // Обработчик для удаления пары
+  const removePairFromTrading = async (pair) => {
     try {
       const response = await api.pairs.remove(pair);
       
@@ -133,11 +134,19 @@ const Dashboard: React.FC = () => {
   };
   
   // Закрытие позиции
-  const closePosition = async (positionId: string, symbol: string) => {
+  const closePosition = async (positionId, symbol) => {
     try {
+      // Отмечаем позицию как закрывающуюся для отображения индикатора загрузки
+      setClosingPositions(prev => ({ ...prev, [positionId]: true }));
+      
+      console.log(`Закрытие позиции: ID=${positionId}, символ=${symbol}`);
+      
       const response = await api.position.close(positionId, symbol);
       
       if (response.success) {
+        // Обновляем статус бота
+        await updateBotStatus();
+        
         // Обновляем список активных пар
         const pairsResponse = await api.pairs.getActive();
         setTradingPairs(pairsResponse);
@@ -147,20 +156,29 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       console.error('Ошибка при закрытии позиции:', err);
       setError('Произошла ошибка при закрытии позиции');
+    } finally {
+      // Убираем индикатор загрузки
+      setClosingPositions(prev => {
+        const updated = { ...prev };
+        delete updated[positionId];
+        return updated;
+      });
     }
   };
   
   const currentError = botError || error;
   
   if (loading && botLoading) {
-    return <Layout botStatus={botStatus}>
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center text-gray-100">
-          <Loader className="w-12 h-12 animate-spin text-blue-400 mb-4" />
-          <p className="text-lg">Загрузка данных...</p>
+    return (
+      <Layout botStatus={botStatus}>
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center text-gray-100">
+            <Loader className="w-12 h-12 animate-spin text-blue-400 mb-4" />
+            <p className="text-lg">Загрузка данных...</p>
+          </div>
         </div>
-      </div>
-    </Layout>;
+      </Layout>
+    );
   }
   
   return (
@@ -312,12 +330,19 @@ const Dashboard: React.FC = () => {
                             {/* Закрытие позиции, если активна */}
                             {pair.status === 'active' && (
                               <button 
-                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 rounded"
+                                className={`text-xs px-2 py-1 ${closingPositions[pair.id] ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-700'} rounded flex items-center`}
                                 onClick={() => closePosition(pair.id, pair.pair)}
+                                disabled={closingPositions[pair.id]}
                               >
-                                Закрыть
+                                {closingPositions[pair.id] ? (
+                                  <>
+                                    <span className="animate-spin h-3 w-3 mr-1 border-t-2 border-b-2 border-white rounded-full"></span>
+                                    Закрытие...
+                                  </>
+                                ) : 'Закрыть'}
                               </button>
                             )}
+                            
                             {/* Кнопка удаления пары (с подтверждением) */}
                             {confirmRemove === pair.pair ? (
                               <div className="flex space-x-1">

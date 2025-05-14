@@ -1,25 +1,28 @@
 // src/api/routes/positionRoutes.js - исправленная версия
 const express = require('express');
+const router = express.Router();
 const positionController = require('../controllers/positionController');
 
-const router = express.Router();
+/**
+ * Маршруты для управления позициями
+ */
 
-// Маршруты для управления позициями
-router.post('/open', positionController.openPosition);
-router.post('/close/:positionId', positionController.closePosition); // Маршрут с параметром
-router.post('/close', positionController.closePosition);
+// Получение активных позиций
 router.get('/active', positionController.getActivePositions);
 
-// Новые маршруты для TP/SL и трейлинг-стопов
-router.post('/tpsl', positionController.setTpsl);
-router.post('/trailing-stop', positionController.setTrailingStop);
+// Открытие новой позиции
+router.post('/open', positionController.openPosition);
 
-// Маршрут для отладки
-router.get('/debug', (req, res) => {
-  res.json({
-    message: 'Position routes are working',
-    timestamp: new Date().toISOString()
-  });
-});
+// Закрытие позиции
+router.post('/close', positionController.closePosition);
+
+// Закрытие позиции по ID (альтернативный маршрут)
+router.post('/close/:positionId', positionController.closePosition);
+
+// Установка TP/SL для существующей позиции
+router.post('/tpsl', positionController.setTpsl);
+
+// Установка трейлинг-стопа для существующей позиции
+router.post('/trailing-stop', positionController.setTrailingStop);
 
 module.exports = router;

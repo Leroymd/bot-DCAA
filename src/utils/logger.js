@@ -1,113 +1,114 @@
-// src/utils/logger.js
+// src/utils/logger.js - улучшенная версия с дополнительным форматированием
 const winston = require('winston');
 const path = require('path');
 const fs = require('fs');
 
 // Создаем директорию для логов, если она не существует
-const logDir = path.join(__dirname, '../../logs');
+const logDir = path.join(__dirname, '../logs');
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-// Настройка транспортов для логгера
-const transports = [
-  // Консольный транспорт
-  new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      winston.format.printf(function(info) {
-        return info.timestamp + ' [' + info.level.toUpperCase() + '] ' + info.message;
-      })
-    )
-  }),
-  
-  // Сохранение всех логов в файл
-  new winston.transports.File({
-    filename: path.join(logDir, 'bot.log'),
-    format: winston.format.combine(
-      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      winston.format.printf(function(info) {
-        return info.timestamp + ' [' + info.level.toUpperCase() + '] ' + info.message;
-      })
-    ),
-    maxsize: 5242880, // 5MB
-    maxFiles: 5
-  }),
-  
-  // Сохранение логов ошибок в отдельный файл
-  new winston.transports.File({
-    filename: path.join(logDir, 'error.log'),
-    level: 'error',
-    format: winston.format.combine(
-      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      winston.format.printf(function(info) {
-        return info.timestamp + ' [' + info.level.toUpperCase() + '] ' + info.message;
-      })
-    ),
-    maxsize: 5242880, // 5MB
-    maxFiles: 5
+// Настраиваем формат для красивого вывода в консоль
+const consoleFormat = winston.format.combine(
+  winston.format.colorize(),
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.printf(({ level, message, timestamp, ...meta }) => {
+    let metaStr = '';
+    if (Object.keys(meta).length > 0) {
+      metaStr = JSON.stringify(meta, null, 2);
+    }
+    return `${timestamp} ${level}: ${message}${metaStr ? `\n${metaStr}` : ''}`;
   })
-];
+);
 
-// Создаем логгер
+// Формат для файла логов
+const fileFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.printf(({ level, message, timestamp, ...meta }) => {
+    let metaStr = '';
+    if (Object.keys(meta).length > 0) {
+      metaStr = JSON.stringify(meta);
+    }
+    return `${timestamp} ${level}: ${message}${metaStr ? ` | ${metaStr}` : ''}`;
+  })
+);
+
+// Создаем экземпляр логгера
 const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  levels: winston.config.npm.levels,
-  transports: transports,
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.json(),
+  defaultMeta: { service: 'fractalscalp-bot' },
+  transports: [
+    // Запись информационных и более детальных логов в файл
+    new winston.transports.File({
+      filename: path.join(logDir, 'bot.log'),
+      format: fileFormat,
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+      tailable: true
+    }),
+    // Запись ошибок в отдельный файл
+    new winston.transports.File({
+      filename: path.join(logDir, 'error.log'),
+      level: 'error',
+      format: fileFormat,
+      maxsize: 5242880, // 5MB
+      maxFiles: 5
+    }),
+    // Вывод в консоль при разработке
+    new winston.transports.Console({
+      format: consoleFormat,
+      level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info'
+    })
+  ],
+  // Не завершать работу при неперехваченных исключениях
   exitOnError: false
 });
 
-// Добавляем обработчик необработанных исключений
-process.on('uncaughtException', function(error) {
-  logger.error('Uncaught Exception: ' + error.message);
-  // Сохраняем сообщение и стек ошибки в файл
-  fs.appendFileSync(
-    path.join(logDir, 'crash.log'), 
-    new Date().toISOString() + ' Uncaught Exception: ' + error.message + '\n' + error.stack + '\n\n'
-  );
-});
+// Логирование необработанных исключений
+logger.exceptions.handle(
+  new winston.transports.File({ 
+    filename: path.join(logDir, 'exceptions.log'),
+    format: fileFormat,
+    maxsize: 5242880, // 5MB
+    maxFiles: 3
+  })
+);
 
-// Добавляем обработчик необработанных отклонений Promise
-process.on('unhandledRejection', function(reason, promise) {
-  logger.error('Unhandled Rejection at promise');
-  // Сохраняем сообщение и причину отклонения в файл
-  fs.appendFileSync(
-    path.join(logDir, 'crash.log'),
-    new Date().toISOString() + ' Unhandled Rejection: ' + reason + '\n\n'
-  );
-});
-
-// Добавим метод для хранения последних N логов в памяти для API
-const memoryLogs = [];
-const MAX_MEMORY_LOGS = 100;
-
-// Заменим метод log стандартного транспорта для поддержки в памяти
-const originalConsoleLog = transports[0].log.bind(transports[0]);
-transports[0].log = function(info, callback) {
-  memoryLogs.unshift({
-    timestamp: info.timestamp,
-    level: info.level,
-    message: info.message
-  });
+// Обработчик для логирования важной информации о работе с Bitget API
+logger.apiCall = function(method, endpoint, body = null, response = null) {
+  if (process.env.LOG_API_CALLS !== 'true') return;
   
-  // Ограничиваем количество логов в памяти
-  if (memoryLogs.length > MAX_MEMORY_LOGS) {
-    memoryLogs.pop();
-  }
+  const logData = {
+    method,
+    endpoint,
+    body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : null,
+    responseStatus: response ? response.status : null,
+    responseData: response ? JSON.stringify(response.data || {}).substring(0, 500) : null
+  };
   
-  originalConsoleLog(info, callback);
+  logger.debug('API Call', logData);
 };
 
-// Метод для получения логов из памяти
-logger.getRecentLogs = function(limit, level) {
-  limit = limit || MAX_MEMORY_LOGS;
-  
-  if (level) {
-    return memoryLogs.filter(function(log) { return log.level === level; }).slice(0, limit);
-  }
-  return memoryLogs.slice(0, limit);
+// Метод для логирования торговых операций
+logger.trade = function(action, symbol, details) {
+  logger.info(`TRADE [${action}] ${symbol}`, { ...details, timestamp: new Date().toISOString() });
 };
 
-// Экспортируем настроенный логгер
+// Метод для логирования ошибок API с дополнительными метаданными
+logger.apiError = function(method, endpoint, error) {
+  const errorDetails = {
+    method,
+    endpoint,
+    message: error.message,
+    status: error.response ? error.response.status : null,
+    statusText: error.response ? error.response.statusText : null,
+    data: error.response ? JSON.stringify(error.response.data || {}).substring(0, 500) : null,
+    stack: error.stack
+  };
+  
+  logger.error(`API Error: ${method} ${endpoint}`, errorDetails);
+};
+
 module.exports = logger;

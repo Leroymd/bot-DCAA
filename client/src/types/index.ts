@@ -1,6 +1,5 @@
+// client/src/types/index.ts - обновленная версия с новыми типами
 // client/src/types/index.ts - обновленная версия
-// Начнем с определения типов данных
-// types/index.ts
 export interface BotStatus {
   isActive: boolean;
   balance: number;
@@ -73,6 +72,11 @@ export interface BotSettings {
   takeProfitPercentage: number;
   stopLossPercentage: number;
   maxTradeDurationMinutes: number;
+  trailingStop?: {
+    enabled: boolean;
+    activationPercentage: number;
+    stopDistance: number;
+  }
 }
 
 export interface OrderFormData {
@@ -91,4 +95,31 @@ export interface TpSlFormData {
 
 export interface TrailingStopFormData {
   callbackRatio: string;
+}
+
+export interface PositionDetails {
+  positionId: string;
+  symbol: string;
+  type: 'LONG' | 'SHORT';
+  size: number;
+  entryPrice: number;
+  currentPrice: number;
+  leverage: number;
+  pnl: number;
+  pnlPercentage: number;
+  margin: number;
+  markPrice: number;
+  liquidationPrice: number;
+  takeProfitPrice?: number;
+  stopLossPrice?: number;
+  hasTrailingStop: boolean;
+  entryTime: string;
+  updateTime: string;
+  status: 'active' | 'closing' | 'closed';
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: string;
 }

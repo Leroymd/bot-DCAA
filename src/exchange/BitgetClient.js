@@ -375,127 +375,169 @@ class BitGetClient {
     });
   }
 
-  // Новый метод для закрытия позиции лимитным ордером
-  async closePositionWithLimit(symbol, price = null) {
-    try {
-      if (!symbol) {
-        logger.error('Не указан символ для закрытия позиции');
-        return { code: 'ERROR', msg: 'Symbol is required' };
+  // Исправленный метод closePositionWithLimit в классе BitGetClient
+async closePositionWithLimit(symbol, price) {
+  try {
+    // Получаем детали позиции
+    const positionResponse = await this.getPositionDetails(symbol);
+    if (!positionResponse || !positionResponse.data) {
+      logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
+      return { code: 'ERROR', msg: `Position for ${symbol} not found` };
+    }
+    
+    const position = positionResponse.data;
+    
+    // Проверяем, что позиция существует и имеет размер
+    if (!position || !position.total || parseFloat(position.total) === 0) {
+      logger.warn(`Нет открытой позиции для ${symbol}`);
+      return { code: 'ERROR', msg: `No open position for ${symbol}` };
+    }
+    
+    // Определяем тип позиции и соответствующие параметры
+    const positionSide = position.holdSide.toLowerCase();
+    
+    // В one-way-mode:
+    // 1. Для закрытия LONG позиции: side="sell"
+    // 2. Для закрытия SHORT позиции: side="buy"
+    const side = positionSide === 'long' ? 'sell' : 'buy';
+    
+    const size = position.available.toString();
+    
+    // Если цена не указана, получаем текущую и добавляем/вычитаем небольшой процент
+    let limitPrice = price;
+    if (!limitPrice) {
+      const ticker = await this.getTicker(symbol);
+      const currentPrice = parseFloat(ticker.data.last);
+      
+      if (positionSide === 'long') {
+        // Для LONG чуть ниже текущей цены (чтобы быстрее исполнился)
+        limitPrice = (currentPrice * 0.995).toFixed(4);
+      } else {
+        // Для SHORT чуть выше текущей цены (чтобы быстрее исполнился)
+        limitPrice = (currentPrice * 1.005).toFixed(4);
       }
+    }
+    
+    // Символьная информация для уточнения precision
+    const symbolInfo = await this.getSymbolInfo(symbol);
+    if (symbolInfo && symbolInfo.pricePrecision) {
+      limitPrice = parseFloat(limitPrice).toFixed(symbolInfo.pricePrecision);
+    }
+    
+    // Формируем параметры для лимитного ордера
+    const orderParams = {
+      symbol: symbol,
+      marginCoin: 'USDT',
+      size: size,
+      price: limitPrice.toString(),
+      side: side,
+      orderType: 'limit',
+      timeInForceValue: 'normal',
+      reduceOnly: "YES", // Важно для указания, что это закрытие позиции
+      productType: "USDT-FUTURES",
+      marginMode: "isolated"
+      // НЕ указываем tradeSide - он не нужен в one-way-mode
+    };
+    
+   
+    
+    // Отправляем ордер
+    logger.info(`Отправка лимитного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
+    const response = await this.submitOrder(orderParams);
+    
+    if (response && response.code === '00000') {
+      logger.info(`Позиция ${symbol} успешно закрыта лимитным ордером: ${JSON.stringify(response.data)}`);
+    } else {
+      logger.warn(`Ошибка при закрытии позиции ${symbol} лимитным ордером: ${response ? response.msg : 'Unknown error'}`);
       
-      logger.info(`Закрытие позиции по лимитному ордеру: ${symbol}, цена=${price || 'рыночная'}`);
+      // Если закрытие лимитным ордером не удалось, попробуем рыночный ордер
+      logger.info(`Пробуем закрыть позицию ${symbol} рыночным ордером...`);
       
-      // Получаем детали позиции для определения размера и типа
-      const positionResponse = await this.getPositionDetails(symbol);
-      
-      if (!positionResponse || !positionResponse.data) {
-        logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
-        return { code: 'ERROR', msg: `Position for ${symbol} not found` };
-      }
-      
-      const position = positionResponse.data;
-      
-      // Проверяем, что позиция существует и имеет размер
-      if (!position || !position.total || parseFloat(position.total) === 0) {
-        logger.warn(`Нет открытой позиции для ${symbol}`);
-        return { code: 'ERROR', msg: `No open position for ${symbol}` };
-      }
-      
-      // Определяем тип позиции
-      const holdSide = position.holdSide.toLowerCase();
-      
-      // Определяем параметры для ордера на закрытие
-      const side = holdSide === 'long' ? 'sell' : 'buy';
-      const tradeSide = holdSide === 'long' ? 'close_long' : 'close_short';
-      const size = position.available.toString();
-      
-      // Если цена не указана, получаем текущую рыночную цену
-      let orderPrice = price;
-      if (!orderPrice) {
-        const ticker = await this.getTicker(symbol);
-        if (!ticker || !ticker.data || !ticker.data.last) {
-          logger.warn(`Не удалось получить текущую цену для ${symbol}`);
-          return { code: 'ERROR', msg: `Failed to get current price for ${symbol}` };
-        }
-        
-        // Устанавливаем цену с небольшим отклонением от рыночной для быстрого исполнения
-        const marketPrice = parseFloat(ticker.data.last);
-        orderPrice = holdSide === 'long' 
-            ? (marketPrice * 0.995).toFixed(position.pricePrecision) // Чуть ниже рынка для быстрого закрытия LONG
-            : (marketPrice * 1.005).toFixed(position.pricePrecision); // Чуть выше рынка для быстрого закрытия SHORT
-      }
-      
-      // Формируем параметры для лимитного ордера
-      const orderParams = {
+      // Формируем параметры для рыночного ордера
+      const marketOrderParams = {
         symbol,
         marginCoin: 'USDT',
         size,
-        price: orderPrice.toString(),
         side,
-        orderType: 'limit',
+        orderType: 'market',
         timeInForceValue: 'normal',
         tradeSide,
         reduceOnly: "YES",
-        productType: "USDT-FUTURES"
+        productType: "USDT-FUTURES",
+        marginMode: "isolated"
       };
       
-      // Отправляем ордер
-      logger.info(`Отправка лимитного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
-      const response = await this.submitOrder(orderParams);
+      // Отправляем рыночный ордер
+      logger.info(`Отправка рыночного ордера на закрытие позиции ${symbol}: ${JSON.stringify(marketOrderParams)}`);
+      const marketResponse = await this.submitOrder(marketOrderParams);
       
-      if (response && response.code === '00000') {
-        logger.info(`Позиция ${symbol} успешно закрыта лимитным ордером: ${JSON.stringify(response.data)}`);
+      if (marketResponse && marketResponse.code === '00000') {
+        logger.info(`Позиция ${symbol} успешно закрыта рыночным ордером: ${JSON.stringify(marketResponse.data)}`);
+        return marketResponse;
       } else {
-        logger.warn(`Ошибка при закрытии позиции ${symbol} лимитным ордером: ${response ? response.msg : 'Unknown error'}`);
+        logger.error(`Не удалось закрыть позицию ${symbol} ни лимитным, ни рыночным ордером`);
+        return marketResponse || response;
       }
-      
-      return response;
-    } catch (error) {
-      logger.error(`Ошибка при закрытии позиции лимитным ордером для ${symbol}: ${error.message}`);
-      return { code: 'ERROR', msg: error.message };
     }
+    
+    return response;
+  } catch (error) {
+    logger.error(`Ошибка при закрытии позиции лимитным ордером для ${symbol}: ${error.message}`);
+    return { code: 'ERROR', msg: error.message };
   }
+}
 
   // Обновленный метод для закрытия позиции по рыночной цене
   async closePosition(symbol, marginCoin = 'USDT') {
-    try {
-      if (!symbol) {
-        logger.error('Не указан символ для закрытия позиции');
-        return { code: 'ERROR', msg: 'Symbol is required' };
-      }
-      
-      logger.info(`Закрытие позиции по рыночной цене: ${symbol}`);
-      
-      // Получаем детали позиции для проверки
-      const positionResponse = await this.getPositionDetails(symbol);
-      
-      if (!positionResponse || !positionResponse.data) {
-        logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
-        return { code: 'ERROR', msg: `Position for ${symbol} not found` };
-      }
-      
-      const position = positionResponse.data;
-      
-      // Проверяем, что позиция существует и имеет размер
-      if (!position || !position.total || parseFloat(position.total) === 0) {
-        logger.warn(`Нет открытой позиции для ${symbol}`);
-        return { code: 'WARNING', msg: `No open position for ${symbol}` };
-      }
-      
-      // Корректные параметры для закрытия позиции по API Bitget
-      const params = {
-        symbol,
-        marginCoin,
-        productType: "USDT-FUTURES"
-      };
-      
-      // Отправляем запрос на закрытие позиции
-      return this.request('POST', '/api/v2/mix/position/close-position', {}, params);
-    } catch (error) {
-      logger.error(`Ошибка при закрытии позиции ${symbol}: ${error.message}`);
-      return { code: 'ERROR', msg: error.message };
+  try {
+    if (!symbol) {
+      logger.error('Не указан символ для закрытия позиции');
+      return { code: 'ERROR', msg: 'Symbol is required' };
     }
+    
+    logger.info(`Закрытие позиции рыночным ордером: ${symbol}`);
+    
+    // Получаем детали позиции
+    const positionResponse = await this.getPositionDetails(symbol);
+    
+    if (!positionResponse || !positionResponse.data) {
+      logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
+      return { code: 'ERROR', msg: `Position for ${symbol} not found` };
+    }
+    
+    const position = positionResponse.data;
+    
+    // Проверяем, что позиция существует и имеет размер
+    if (!position || !position.total || parseFloat(position.total) === 0) {
+      logger.warn(`Нет открытой позиции для ${symbol}`);
+      return { code: 'WARNING', msg: `No open position for ${symbol}` };
+    }
+    
+    // Определяем сторону для закрытия
+    const holdSide = position.holdSide.toLowerCase();
+    const side = holdSide === 'long' ? 'sell' : 'buy';
+    const size = position.available.toString();
+    
+    // Формируем параметры для рыночного ордера закрытия позиции
+    const orderParams = {
+      symbol,
+      marginCoin,
+      size,
+      side,
+      orderType: 'market',
+      timeInForceValue: 'normal',
+      reduceOnly: "YES",
+      productType: "USDT-FUTURES",
+      marginMode: "isolated"
+    };
+    
+    logger.info(`Отправка рыночного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
+    return await this.submitOrder(orderParams);
+  } catch (error) {
+    logger.error(`Ошибка при закрытии позиции ${symbol}: ${error.message}`);
+    return { code: 'ERROR', msg: error.message };
   }
+}
 
   async getTicker(symbol) {
     try {
@@ -642,7 +684,7 @@ class BitGetClient {
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal', // Обязательный параметр согласно документации
         tradeSide: formattedTradeSide,
-        marginMode: 'isolated',
+        marginMode: 'isolated', // Обязательный параметр
         productType: "USDT-FUTURES"
       };
 
@@ -722,7 +764,7 @@ class BitGetClient {
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal',
         tradeSide: formattedTradeSide,
-        marginMode: 'isolated',
+        marginMode: 'isolated', // Обязательный параметр
         productType: "USDT-FUTURES"
       };
 

@@ -1,18 +1,19 @@
-// contexts/AppContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// client/src/contexts/AppContext.tsx - обновленная версия
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import { BotStatus } from '../types';
 
+// Интерфейс контекста приложения
 interface AppContextType {
   botStatus: BotStatus;
-  updateBotStatus: () => Promise<void>;
-  toggleBotStatus: () => Promise<void>;
   loading: boolean;
   error: string | null;
-  setError: (error: string | null) => void;
+  updateBotStatus: () => Promise<void>;
 }
 
+// Значение контекста по умолчанию
 const defaultBotStatus: BotStatus = {
+  status: 'stopped',
   isActive: false,
   balance: 0,
   totalProfit: 0,
@@ -23,77 +24,83 @@ const defaultBotStatus: BotStatus = {
   totalTrades: 0,
   avgProfit: 0,
   withdrawn: 0,
-  lastScan: null
+  lastScan: undefined,
+  uptime: 0,
+  startTime: 0
 };
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+// Создание контекста
+const AppContext = createContext<AppContextType>({
+  botStatus: defaultBotStatus,
+  loading: false,
+  error: null,
+  updateBotStatus: async () => {}
+});
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// Хук для использования контекста
+export const useAppContext = () => useContext(AppContext);
+
+// Провайдер контекста
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [botStatus, setBotStatus] = useState<BotStatus>(defaultBotStatus);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
+  
+  // Функция для обновления статуса бота
   const updateBotStatus = async () => {
     try {
       setLoading(true);
-      const data = await api.bot.getStatus();
-      setBotStatus(data);
-      setLoading(false);
+      const status = await api.bot.getStatus();
+      setBotStatus(status);
+      setError(null);
     } catch (err) {
       console.error('Ошибка при получении статуса бота:', err);
-      setError('Не удалось получить статус бота. Проверьте соединение с сервером.');
+      setError('Не удалось получить статус бота');
+    } finally {
       setLoading(false);
     }
   };
-
-  const toggleBotStatus = async () => {
-    try {
-      const endpoint = botStatus.isActive ? api.bot.stop : api.bot.start;
-      const response = await endpoint();
-      
-      if (response.success) {
-        setBotStatus(prev => ({
-          ...prev,
-          isActive: !prev.isActive
-        }));
-      } else {
-        setError(response.message || 'Не удалось изменить статус бота');
-      }
-    } catch (err) {
-      console.error('Ошибка при изменении статуса бота:', err);
-      setError('Произошла ошибка при изменении статуса бота');
-    }
-  };
-
+  
+  // Получение статуса бота при монтировании компонента
   useEffect(() => {
-    updateBotStatus();
+    let isActive = true;
     
-    // Периодическое обновление статуса
-    const interval = setInterval(updateBotStatus, 15000);
+    const fetchBotStatus = async () => {
+      try {
+        setLoading(true);
+        const status = await api.bot.getStatus();
+        
+        if (isActive) {
+          setBotStatus(status);
+          setError(null);
+        }
+      } catch (err) {
+        console.error('Ошибка при получении статуса бота:', err);
+        if (isActive) {
+          setError('Не удалось получить статус бота');
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    };
     
+    fetchBotStatus();
+    
+    // Настройка периодического обновления статуса
+    const interval = setInterval(fetchBotStatus, 30000);
+    
+    // Очистка при размонтировании
     return () => {
+      isActive = false;
       clearInterval(interval);
     };
   }, []);
-
+  
   return (
-    <AppContext.Provider value={{ 
-      botStatus, 
-      updateBotStatus,
-      toggleBotStatus,
-      loading,
-      error,
-      setError
-    }}>
+    <AppContext.Provider value={{ botStatus, loading, error, updateBotStatus }}>
       {children}
     </AppContext.Provider>
   );
-};
-
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
-  return context;
 };
