@@ -162,24 +162,70 @@ exports.closePosition = async function(req, res) {
       });
     }
     
-    let result;
+    // ИСПРАВЛЕНО: Получаем дополнительную информацию о позиции перед закрытием
+    let positionInfo = null;
     
-    // Если указан символ (но нет ID), закрываем по символу
-    if (symbol && !positionId) {
-      logger.info(`Закрытие позиции по символу: ${symbol}`);
-      result = await tradingBot.positionManager.closePositionBySymbol(symbol);
-    } 
-    // Если указан ID, закрываем по ID
-    else if (positionId) {
-      logger.info(`Закрытие позиции по ID: ${positionId}`);
-      result = await tradingBot.positionManager.closePosition(positionId);
+    // Если известен ID позиции, но не символ, пытаемся найти символ по ID
+    if (positionId && !symbol) {
+      const openPositions = await tradingBot.positionManager.updateOpenPositions();
+      positionInfo = openPositions.find(p => p.id === positionId);
+      
+      if (positionInfo) {
+        symbol = positionInfo.symbol;
+        logger.info(`Найден символ ${symbol} для позиции с ID ${positionId}`);
+      } else {
+        logger.warn(`Не удалось найти позицию с ID ${positionId}`);
+      }
     }
     
-    if (!result) {
-      return res.status(500).json({
-        success: false,
-        message: 'Не удалось закрыть позицию'
-      });
+    // Если есть и ID и символ, используем оба для закрытия
+    if (positionId && symbol) {
+      logger.info(`Закрытие позиции с ID ${positionId}, символ: ${symbol}`);
+      
+      // Обновляем открытые позиции для получения актуальных данных
+      await tradingBot.positionManager.updateOpenPositions();
+      
+      // Закрываем позицию с использованием символа для большей надежности
+      const result = await tradingBot.positionManager.closePosition(positionId);
+      
+      if (!result) {
+        // Если не удалось закрыть по ID, пробуем по символу
+        logger.warn(`Не удалось закрыть позицию по ID ${positionId}, пробуем по символу ${symbol}`);
+        const symbolResult = await tradingBot.positionManager.closePositionBySymbol(symbol);
+        
+        if (!symbolResult) {
+          return res.status(500).json({
+            success: false,
+            message: `Не удалось закрыть позицию ${symbol}`
+          });
+        }
+      }
+    } 
+    // Если указан только символ, закрываем по символу
+    else if (symbol) {
+      logger.info(`Закрытие позиции по символу: ${symbol}`);
+      
+      const result = await tradingBot.positionManager.closePositionBySymbol(symbol);
+      
+      if (!result) {
+        return res.status(500).json({
+          success: false,
+          message: `Не удалось закрыть позицию ${symbol}`
+        });
+      }
+    }
+    // Если указан только ID, закрываем по ID
+    else if (positionId) {
+      logger.info(`Закрытие позиции по ID: ${positionId}`);
+      
+      const result = await tradingBot.positionManager.closePosition(positionId);
+      
+      if (!result) {
+        return res.status(500).json({
+          success: false,
+          message: `Не удалось закрыть позицию с ID ${positionId}`
+        });
+      }
     }
     
     // Обновляем список открытых позиций
