@@ -1,4 +1,4 @@
-// client/src/pages/Dashboard.tsx - исправленная версия без блока статуса бота
+// client/src/pages/Dashboard.tsx - полная версия с исправлениями
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Bell, Settings, TrendingUp, Activity, DollarSign, Clock, 
@@ -239,7 +239,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             
-            {/* График PnL */}
+            {/* График P&L */}
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold">График P&L</h3>
@@ -322,7 +322,7 @@ const Dashboard: React.FC = () => {
                           <td className={pair.profit && pair.profit > 0 ? 'text-green-400' : pair.profit && pair.profit < 0 ? 'text-red-400' : 'text-gray-400'}>
                             {pair.profit && pair.profit > 0 ? '+' : ''}{pair.profit?.toFixed(2) || '0.00'}%
                           </td>
-                          <td>{pair.time || '-'}</td>
+                          <td>{pair.time && pair.time !== 'NaN:NaN' ? pair.time : '00:00'}</td>
                           <td>{pair.signals || 0}</td>
                           <td className="flex space-x-2">
                             {/* Закрытие позиции, если активна */}

@@ -8,8 +8,7 @@
     "XRPUSDT",
     "XLMUSDT",
     "FILUSDT",
-    "ICPUSDT",
-    "SOLUSDT"
+    "ICPUSDT"
   ],
   "maxTradingPairs": 5,
   "pacLength": 34,
@@ -21,8 +20,8 @@
   "pullbackLookback": 3,
   "positionSize": 30,
   "leverage": 5,
-  "takeProfitPercentage": 2.5,
-  "stopLossPercentage": 1.5,
+  "takeProfitPercentage": 3,
+  "stopLossPercentage": 1,
   "maxTradeDurationMinutes": 5,
   "trailingStop": {
     "enabled": true,

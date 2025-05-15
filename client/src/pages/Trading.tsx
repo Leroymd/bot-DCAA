@@ -1,4 +1,4 @@
-// client/src/pages/Trading.tsx - обновленная версия
+// client/src/pages/Trading.tsx - полная версия с исправлениями
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, X, Settings } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -410,7 +410,9 @@ const Trading: React.FC = () => {
                       <td className={`p-4 ${position.profit && position.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {position.profit && position.profit >= 0 ? '+' : ''}{position.profit?.toFixed(2) || '0.00'}%
                       </td>
-                      <td className="p-4">{position.time || '00:00'}</td>
+                      <td className="p-4">
+                        {position.time && position.time !== 'NaN:NaN' ? position.time : '00:00'}
+                      </td>
                       <td className="p-4 flex items-center space-x-2">
                         <button 
                           className={`px-3 py-1 ${closingPositions[position.id] ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-700'} rounded-md text-sm flex items-center`}

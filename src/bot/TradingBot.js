@@ -386,97 +386,62 @@ class TradingBot extends EventEmitter {
   }
   
   getTradingPairsInfo() {
-    const pairs = [];
+  const pairs = [];
+  const now = new Date().getTime(); // Текущее время для вычисления длительности
+  
+  for (const pairSymbol of this.config.tradingPairs) {
+    const positions = this.positionManager.getOpenPositions().filter(p => p.symbol === pairSymbol);
+    const position = positions.length > 0 ? positions[0] : null;
     
-    for (const pairSymbol of this.config.tradingPairs) {
-      const positions = this.positionManager.getOpenPositions().filter(p => p.symbol === pairSymbol);
-      const position = positions.length > 0 ? positions[0] : null;
-      
-      pairs.push({
-        pair: pairSymbol,
-        status: position ? 'active' : 'waiting',
-        position: position ? position.type : null,
-        profit: position ? position.currentPnl : 0,
-        time: position ? this.formatDuration(new Date().getTime() - position.entryTime) : '-',
-        signals: this.indicatorManager.getSignalCount(pairSymbol) || 0
-      });
+    // Вычисляем время с проверкой на валидность entryTime
+    let timeString = '-';
+    if (position && position.entryTime) {
+      try {
+        const entryTimeMs = position.entryTime;
+        // Делаем дополнительную проверку на валидность entryTime
+        if (!isNaN(entryTimeMs) && entryTimeMs > 0) {
+          const durationMs = now - entryTimeMs;
+          if (!isNaN(durationMs) && durationMs >= 0) {
+            timeString = this.formatDuration(durationMs);
+          }
+        }
+      } catch (error) {
+        logger.warn(`Ошибка при вычислении времени для ${pairSymbol}: ${error.message}`);
+      }
     }
     
-    return pairs;
+    pairs.push({
+      pair: pairSymbol,
+      status: position ? 'active' : 'waiting',
+      position: position ? position.type : null,
+      profit: position ? position.currentPnl : 0,
+      time: timeString, // Используем обработанное время с защитой от ошибок
+      signals: this.indicatorManager.getSignalCount(pairSymbol) || 0
+    });
   }
   
-  formatDuration(ms) {
+  return pairs;
+}
+
+formatDuration(ms) {
+  try {
+    // Проверяем, что ms - это валидное число
+    if (isNaN(ms) || ms < 0) {
+      logger.warn(`Невалидное значение для форматирования длительности: ${ms}`);
+      return "00:00"; // Возвращаем значение по умолчанию для отображения
+    }
+    
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     
+    // Форматируем с ведущими нулями для единообразия
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  } catch (error) {
+    logger.error(`Ошибка при форматировании длительности: ${error.message}`);
+    return "00:00"; // В случае любой ошибки возвращаем стандартное время
   }
-
-  startIntervals() {
-    const tradingInterval = setInterval(async () => {
-      try {
-        if (this.status.status !== 'running') return;
-        
-        this.checkAndUpdateDailyStats();
-        
-        await this.updateMarketData();
-        
-        await this.indicatorManager.updateIndicators();
-        
-        await this.positionManager.updateOpenPositions();
-        
-        await this.positionManager.updateTrailingStops();
-        
-        await this.positionManager.checkPositionDuration();
-        
-        if (this.checkDailyLossLimit()) {
-          logger.warn('Достигнут дневной лимит убытков. Торговля приостановлена.');
-          return;
-        }
-        
-        await this.checkProfitWithdrawal();
-        
-        await this.strategy.execute();
-        
-        this.updateStatus();
-        
-      } catch (error) {
-        logger.error(`Ошибка в торговом цикле: ${error.message}`);
-      }
-    }, 60000);
-    
-    const fastUpdateInterval = setInterval(async () => {
-      try {
-        if (this.status.status !== 'running') return;
-        
-        for (const symbol of this.config.tradingPairs) {
-          const ticker = await this.client.getTicker(symbol);
-          if (ticker && ticker.data && ticker.data.last) {
-            this.currentPrice[symbol] = parseFloat(ticker.data.last);
-          }
-        }
-        
-        await this.positionManager.updateTrailingStops();
-        
-      } catch (error) {
-        logger.error(`Ошибка в быстром обновлении: ${error.message}`);
-      }
-    }, 15000);
-    
-    const historyInterval = setInterval(() => {
-      try {
-        if (this.status.status !== 'running') return;
-        
-        this.saveTradeHistory();
-        
-      } catch (error) {
-        logger.error(`Ошибка при сохранении истории: ${error.message}`);
-      }
-    }, 300000);
-    
-    this.intervals.push(tradingInterval, fastUpdateInterval, historyInterval);
-  }
+}
 
   async updateMarketData() {
     try {
@@ -544,7 +509,9 @@ class TradingBot extends EventEmitter {
     }
   }
 
-  updateStatus() {
+  // Улучшенная версия updateStatus для TradingBot.js с дополнительным логированием
+
+updateStatus() {
   const now = new Date().getTime();
   
   if (this.status.status === 'running') {
@@ -581,26 +548,61 @@ class TradingBot extends EventEmitter {
   
   this.status.balance = this.balance;
   
-  // Получаем активные позиции прямо с биржи
+  // Получаем активные позиции прямо с биржи и обрабатываем время корректно
   if (this.client) {
     this.positionManager.updateOpenPositions().then(positions => {
+      // Логируем полученные открытые позиции для отладки
+      logger.debug(`updateStatus: получено ${positions.length} открытых позиций`);
+      
       // Обновляем торговые пары на основе реальных позиций
       const tradingPairs = [];
       
-      // Добавляем активные позиции
+      // Добавляем активные позиции с корректным форматированием времени
       for (const position of positions) {
-        const timeString = this.formatDuration(now - position.entryTime);
-        
-        tradingPairs.push({
-          pair: position.symbol,
-          status: 'active',
-          position: position.type,
-          entryPrice: position.entryPrice,
-          currentPrice: position.currentPrice || this.currentPrice[position.symbol] || 0,
-          profit: position.pnlPercentage || 0,
-          time: timeString,
-          id: position.id
-        });
+        try {
+          // Логируем детали позиции для отладки
+          logger.debug(`Обработка позиции в updateStatus: ${position.symbol}, entryTime=${position.entryTime}, now=${now}`);
+          
+          let timeString = '00:00'; // Значение по умолчанию
+          
+          if (position.entryTime) {
+            const durationMs = now - position.entryTime;
+            logger.debug(`Длительность позиции ${position.symbol}: ${durationMs}ms`);
+            
+            if (!isNaN(durationMs) && durationMs >= 0) {
+              timeString = this.formatDuration(durationMs);
+              logger.debug(`Форматированное время для ${position.symbol}: ${timeString}`);
+            } else {
+              logger.warn(`Невалидная длительность для ${position.symbol}: ${durationMs}ms`);
+            }
+          } else {
+            logger.warn(`Отсутствует entryTime для позиции ${position.symbol}`);
+          }
+          
+          tradingPairs.push({
+            pair: position.symbol,
+            status: 'active',
+            position: position.type,
+            entryPrice: position.entryPrice,
+            currentPrice: position.currentPrice || this.currentPrices[position.symbol] || 0,
+            profit: position.pnlPercentage || 0,
+            time: timeString,
+            id: position.id
+          });
+        } catch (error) {
+          logger.error(`Ошибка при обработке позиции ${position.symbol}: ${error.message}`);
+          // Добавляем позицию с безопасными значениями
+          tradingPairs.push({
+            pair: position.symbol,
+            status: 'active',
+            position: position.type,
+            entryPrice: position.entryPrice || 0,
+            currentPrice: position.currentPrice || 0,
+            profit: position.pnlPercentage || 0,
+            time: '00:00',
+            id: position.id
+          });
+        }
       }
       
       // Добавляем остальные торговые пары без позиций
@@ -614,6 +616,14 @@ class TradingBot extends EventEmitter {
             time: '00:00',
             signals: this.indicatorManager.getSignalCount(symbol) || 0
           });
+        }
+      }
+      
+      // Логируем итоговый список пар
+      logger.debug(`updateStatus: сформирован список из ${tradingPairs.length} пар (${tradingPairs.filter(p => p.status === 'active').length} активных)`);
+      for (const pair of tradingPairs) {
+        if (pair.status === 'active') {
+          logger.debug(`Активная пара: ${pair.pair}, время=${pair.time}, profit=${pair.profit}`);
         }
       }
       
@@ -633,6 +643,32 @@ class TradingBot extends EventEmitter {
   this.emit('update', this.status);
   
   return this.status;
+}
+
+// Улучшенный метод форматирования длительности
+formatDuration(ms) {
+  try {
+    // Проверяем, что ms - это валидное число
+    if (isNaN(ms) || ms < 0) {
+      logger.warn(`Невалидное значение для форматирования длительности: ${ms}`);
+      return "00:00"; // Возвращаем значение по умолчанию для отображения
+    }
+    
+    // Логируем входное значение для отладки
+    logger.debug(`Форматирование длительности: ${ms}ms`);
+    
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    
+    const formattedTime = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    logger.debug(`Форматированное время: ${formattedTime}`);
+    
+    return formattedTime;
+  } catch (error) {
+    logger.error(`Ошибка при форматировании длительности: ${error.message}`);
+    return "00:00"; // В случае любой ошибки возвращаем стандартное время
+  }
 }
 
   async checkProfitWithdrawal() {

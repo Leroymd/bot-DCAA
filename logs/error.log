@@ -428,3 +428,4 @@
 2025-05-12 17:51:33 [ERROR] Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
 2025-05-12 17:51:45 [ERROR] Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
 2025-05-12 17:53:04 [ERROR] Uncaught Exception: Route.get() requires a callback function but got a [object Undefined]
+2025-05-12 20:04:14 [ERROR] Торговый бот не инициализирован или нет клиента API
