@@ -1,4 +1,4 @@
-// src/exchange/BitgetClient.js - исправленная версия
+// src/exchange/BitgetClient.js - оптимизированная версия
 const axios = require('axios');
 const crypto = require('crypto');
 const querystring = require('querystring');
@@ -26,8 +26,7 @@ class BitGetClient {
     
     // Проверка наличия ключей API
     if (!this.apiKey || !this.apiSecret || !this.passphrase) {
-      logger.error('API ключи не установлены. Для работы с реальной биржей необходимы ключи API.');
-      throw new Error('API ключи не установлены');
+      logger.warn('API ключи не установлены. Для работы с реальной биржей необходимы ключи API.');
     }
   }
 
@@ -53,58 +52,6 @@ class BitGetClient {
     } catch (error) {
       logger.error(`Error generating signature: ${error.message}`);
       throw error;
-    }
-  }
-
-  async getExchangeInfo() {
-    try {
-      logger.info('Получение информации о доступных торговых парах...');
-      
-      const response = await this.request('GET', '/api/v2/mix/market/contracts', {
-        productType: "USDT-FUTURES"
-      });
-      
-      // Обработка ответа и преобразование к нужному формату
-      if (response && response.code === '00000' && response.data) {
-        logger.info(`Успешно получена информация о ${response.data.length} торговых парах`);
-        
-        if (this.debug) {
-          // В режиме отладки выводим первые несколько пар
-          logger.debug(`Пример данных: ${JSON.stringify(response.data.slice(0, 3))}`);
-        }
-        
-        return response;
-      } else {
-        logger.warn(`Ошибка при получении информации о торговых парах: ${response ? response.msg : 'пустой ответ'}`);
-        return { code: 'ERROR', msg: response ? response.msg : 'Empty response', data: [] };
-      }
-    } catch (error) {
-      logger.error(`Ошибка в getExchangeInfo: ${error.message}`);
-      return { code: 'ERROR', msg: error.message, data: [] };
-    }
-  }
-
-  // Вспомогательный метод для получения информации о конкретном символе
-  async getSymbolInfo(symbol) {
-    try {
-      const response = await this.getExchangeInfo();
-      
-      if (!response || !response.data || !Array.isArray(response.data)) {
-        logger.warn(`Не удалось получить информацию о символе ${symbol}`);
-        return null;
-      }
-      
-      // Ищем наш символ в списке
-      const symbolInfo = response.data.find(item => item.symbol === symbol);
-      if (!symbolInfo) {
-        logger.warn(`Символ ${symbol} не найден в списке доступных`);
-        return null;
-      }
-      
-      return symbolInfo;
-    } catch (error) {
-      logger.error(`Ошибка при получении информации о символе ${symbol}: ${error.message}`);
-      return null;
     }
   }
 
@@ -205,6 +152,7 @@ class BitGetClient {
         }
       }
       
+      // Повторяем запрос при временных ошибках
       if (retryCount < this.maxRetries && 
         (error.code === 'ECONNABORTED' || 
          error.code === 'ETIMEDOUT' || 
@@ -227,6 +175,58 @@ class BitGetClient {
     } catch (error) {
       logger.error(`Ошибка в getServerTime: ${error.message}`);
       throw error;
+    }
+  }
+
+  async getExchangeInfo() {
+    try {
+      logger.info('Получение информации о доступных торговых парах...');
+      
+      const response = await this.request('GET', '/api/v2/mix/market/contracts', {
+        productType: "USDT-FUTURES"
+      });
+      
+      // Обработка ответа и преобразование к нужному формату
+      if (response && response.code === '00000' && response.data) {
+        logger.info(`Успешно получена информация о ${response.data.length} торговых парах`);
+        
+        if (this.debug) {
+          // В режиме отладки выводим первые несколько пар
+          logger.debug(`Пример данных: ${JSON.stringify(response.data.slice(0, 3))}`);
+        }
+        
+        return response;
+      } else {
+        logger.warn(`Ошибка при получении информации о торговых парах: ${response ? response.msg : 'пустой ответ'}`);
+        return { code: 'ERROR', msg: response ? response.msg : 'Empty response', data: [] };
+      }
+    } catch (error) {
+      logger.error(`Ошибка в getExchangeInfo: ${error.message}`);
+      return { code: 'ERROR', msg: error.message, data: [] };
+    }
+  }
+
+  // Вспомогательный метод для получения информации о конкретном символе
+  async getSymbolInfo(symbol) {
+    try {
+      const response = await this.getExchangeInfo();
+      
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        logger.warn(`Не удалось получить информацию о символе ${symbol}`);
+        return null;
+      }
+      
+      // Ищем наш символ в списке
+      const symbolInfo = response.data.find(item => item.symbol === symbol);
+      if (!symbolInfo) {
+        logger.warn(`Символ ${symbol} не найден в списке доступных`);
+        return null;
+      }
+      
+      return symbolInfo;
+    } catch (error) {
+      logger.error(`Ошибка при получении информации о символе ${symbol}: ${error.message}`);
+      return null;
     }
   }
 
@@ -268,7 +268,7 @@ class BitGetClient {
       throw error;
     }
   }
-  
+
   async getPositions(symbol, marginCoin = 'USDT') {
     const params = { productType: "USDT-FUTURES" };
     if (symbol) params.symbol = symbol;
@@ -331,23 +331,60 @@ class BitGetClient {
     }
   }
 
-  // Метод для получения деталей ордера
-  async getOrderDetails(symbol, orderId) {
+  async getTicker(symbol) {
     try {
-      const params = {
-        symbol,
-        orderId,
-        productType: "USDT-FUTURES"
-      };
+      const response = await this.request('GET', '/api/v2/mix/market/ticker', { 
+        symbol, 
+        productType: "USDT-FUTURES" 
+      });
       
-      return this.request('GET', '/api/v2/mix/order/detail', params);
+      if (!response) {
+        logger.warn(`Пустой ответ для getTicker ${symbol}`);
+        return { code: 'ERROR', msg: 'Пустой ответ', data: null };
+      }
+      
+      if (response.code && response.code !== '00000') {
+        logger.warn(`API ошибка getTicker: ${response.code} - ${response.msg}`);
+        return response;
+      }
+      
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const dataItem = response.data[0];
+        if (dataItem.lastPr && !dataItem.last) {
+          dataItem.last = dataItem.lastPr;
+        }
+        return { code: '00000', data: dataItem };
+      } 
+      else if (response.data && typeof response.data === 'object') {
+        if (response.data.lastPr && !response.data.last) {
+          response.data.last = response.data.lastPr;
+        }
+        return response;
+      }
+      else if (response.ticker || response.tickers) {
+        const tickerData = response.ticker || (Array.isArray(response.tickers) ? response.tickers[0] : null);
+        if (tickerData) {
+          if (tickerData.lastPr && !tickerData.last) {
+            tickerData.last = tickerData.lastPr;
+          }
+          return { code: '00000', data: tickerData };
+        }
+      }
+      
+      if (response.last || response.price || response.lastPr || 
+          (response.data && (response.data.last || response.data.price || response.data.lastPr))) {
+        const lastPrice = response.last || response.price || response.lastPr || 
+                          (response.data && (response.data.last || response.data.price || response.data.lastPr));
+        return { code: '00000', data: { last: lastPrice } };
+      }
+      
+      return response;
     } catch (error) {
-      logger.error(`Ошибка при получении деталей ордера ${orderId}: ${error.message}`);
+      logger.error(`Ошибка в getTicker: ${error.message}`);
       throw error;
     }
   }
 
-  // ДОБАВЛЕН МЕТОД: Получение исторических свечей
   async getCandles(symbol, granularity, limit = 100) {
     try {
       if (!symbol || !granularity) {
@@ -403,273 +440,14 @@ class BitGetClient {
     });
   }
 
-  // Исправленный метод для отправки ордера согласно актуальной документации
-  async submitOrder(params) {
-    // Проверяем обязательные параметры
-    if (!params.timeInForceValue) {
-      // По умолчанию используем normal, если не указано
-      params.timeInForceValue = 'normal';
-    }
-    
-    const orderParams = {
-      ...params,
-      productType: "USDT-FUTURES"
-    };
-    
-    return this.request('POST', '/api/v2/mix/order/place-order', {}, orderParams);
-  }
-
-  // Исправленный метод для отправки плановых ордеров (TP/SL, трейлинг-стоп)
-  async submitPlanOrder(params) {
-    if (!params.planType) {
-      params.planType = params.callbackRatio ? "trailing_stop_plan" : "normal_plan";
-    }
-    
-    if (!params.tradeSide) {
-      params.tradeSide = "close";
-    }
-    
-    if (!params.timeInForceValue) {
-      params.timeInForceValue = "normal";
-    }
-    
-    if (!params.triggerType) {
-      params.triggerType = "mark_price";
-    }
-    
-    let endpoint = '/api/v2/mix/order/place-plan-order';
-    
-    if (params.planType === "profit_plan" || params.planType === "loss_plan") {
-      endpoint = '/api/v2/mix/order/place-tpsl-order';
-    }
-    
-    if (params.planType === "trailing_stop_plan" && !params.callbackRatio) {
-      logger.warn("Предупреждение: для трейлинг-стопа необходимо указать callbackRatio");
-      params.callbackRatio = "2";
-    }
-    
-    const planParams = {
-      ...params,
-      productType: "USDT-FUTURES"
-    };
-    
-    return this.request('POST', endpoint, {}, planParams);
-  }
-
-  async cancelOrder(symbol, marginCoin, orderId) {
-    return this.request('POST', '/api/v2/mix/order/cancel-order', {}, {
+  async getHistoricalOrders(symbol, startTime, endTime, pageSize = 100) {
+    return this.request('GET', '/api/v2/mix/order/history', {
       symbol,
-      marginCoin,
-      orderId,
+      startTime,
+      endTime,
+      pageSize,
       productType: "USDT-FUTURES"
     });
-  }
-
-  // ИСПРАВЛЕНО: Метод для закрытия позиции лимитным ордером в одностороннем режиме
-  async closePositionWithLimit(symbol, price = null) {
-    try {
-      if (!symbol) {
-        logger.error('Не указан символ для закрытия позиции');
-        return { code: 'ERROR', msg: 'Symbol is required' };
-      }
-      
-      logger.info(`Закрытие позиции по лимитному ордеру: ${symbol}, цена=${price || 'рыночная'}`);
-      
-      // Получаем детали позиции для определения размера и типа
-      const positionResponse = await this.getPositionDetails(symbol);
-      
-      if (!positionResponse || !positionResponse.data) {
-        logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
-        return { code: 'ERROR', msg: `Position for ${symbol} not found` };
-      }
-      
-      const position = positionResponse.data;
-      
-      // Проверяем, что позиция существует и имеет размер
-      if (!position || !position.total || parseFloat(position.total) === 0) {
-        logger.warn(`Нет открытой позиции для ${symbol}`);
-        return { code: 'ERROR', msg: `No open position for ${symbol}` };
-      }
-      
-      // Определяем тип позиции (long или short)
-      const holdSide = position.holdSide.toLowerCase();
-      
-      // !!! ИСПРАВЛЕНО: В one-way-mode для закрытия необходимо указать противоположный side
-      // и не указывать tradeSide (он требуется только для hedge-mode)
-      const side = holdSide === 'long' ? 'sell' : 'buy';
-      const size = position.available.toString();
-      
-      // Если цена не указана, получаем текущую рыночную цену
-      let orderPrice = price;
-      if (!orderPrice) {
-        const ticker = await this.getTicker(symbol);
-        if (!ticker || !ticker.data || !ticker.data.last) {
-          logger.warn(`Не удалось получить текущую цену для ${symbol}`);
-          return { code: 'ERROR', msg: `Failed to get current price for ${symbol}` };
-        }
-        
-        // Устанавливаем цену с небольшим отклонением от рыночной для быстрого исполнения
-        const marketPrice = parseFloat(ticker.data.last);
-        orderPrice = holdSide === 'long' 
-            ? (marketPrice * 0.995).toFixed(position.pricePrecision) // Чуть ниже рынка для быстрого закрытия LONG
-            : (marketPrice * 1.005).toFixed(position.pricePrecision); // Чуть выше рынка для быстрого закрытия SHORT
-      }
-      
-      // !!! ИСПРАВЛЕНО: Добавлен параметр marginMode в запрос
-      const orderParams = {
-        symbol,
-        marginCoin: 'USDT',
-        size,
-        price: orderPrice.toString(),
-        side, // Противоположное направление текущей позиции
-        orderType: 'limit',
-        timeInForceValue: 'normal',
-        marginMode: 'isolated', // Добавлен обязательный параметр marginMode
-        reduceOnly: "YES", // Указываем, что ордер должен только сокращать позицию
-        productType: "USDT-FUTURES"
-      };
-      
-      // !!! ВАЖНО: Не указываем tradeSide для one-way-mode
-      
-      // Отправляем ордер
-      logger.info(`Отправка лимитного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
-      const response = await this.submitOrder(orderParams);
-      
-      if (response && response.code === '00000') {
-        logger.info(`Позиция ${symbol} успешно закрыта лимитным ордером: ${JSON.stringify(response.data)}`);
-      } else {
-        logger.warn(`Ошибка при закрытии позиции ${symbol} лимитным ордером: ${response ? response.msg : 'Unknown error'}`);
-      }
-      
-      return response;
-    } catch (error) {
-      logger.error(`Ошибка при закрытии позиции лимитным ордером для ${symbol}: ${error.message}`);
-      return { code: 'ERROR', msg: error.message };
-    }
-  }
-
-  // ИСПРАВЛЕНО: Метод для закрытия позиции по рыночной цене в одностороннем режиме
-  async closePosition(symbol, marginCoin = 'USDT') {
-    try {
-      if (!symbol) {
-        logger.error('Не указан символ для закрытия позиции');
-        return { code: 'ERROR', msg: 'Symbol is required' };
-      }
-      
-      logger.info(`Закрытие позиции по рыночной цене: ${symbol}`);
-      
-      // Получаем детали позиции для проверки
-      const positionResponse = await this.getPositionDetails(symbol);
-      
-      if (!positionResponse || !positionResponse.data) {
-        logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
-        return { code: 'ERROR', msg: `Position for ${symbol} not found` };
-      }
-      
-      const position = positionResponse.data;
-      
-      // Проверяем, что позиция существует и имеет размер
-      if (!position || !position.total || parseFloat(position.total) === 0) {
-        logger.warn(`Нет открытой позиции для ${symbol}`);
-        return { code: 'WARNING', msg: `No open position for ${symbol}` };
-      }
-      
-      // !!! ИСПРАВЛЕНО: Вместо вызова специального эндпоинта create-position, используем обычный place-order 
-      // с противоположным side и параметром reduceOnly: "YES" для закрытия позиции
-      
-      // Определяем тип позиции
-      const holdSide = position.holdSide.toLowerCase();
-      
-      // Определяем противоположную сторону для закрытия
-      const side = holdSide === 'long' ? 'sell' : 'buy';
-      
-      // Получаем размер позиции
-      const size = position.available.toString();
-      
-      // !!! ИСПРАВЛЕНО: Добавлен параметр marginMode в запрос
-      const orderParams = {
-        symbol,
-        marginCoin,
-        size,
-        side, // Противоположное направление текущей позиции
-        orderType: 'market', // Рыночный ордер для быстрого исполнения
-        timeInForceValue: 'normal',
-        marginMode: 'isolated', // Добавлен обязательный параметр marginMode
-        reduceOnly: "YES", // Указываем, что ордер должен только сокращать позицию
-        productType: "USDT-FUTURES"
-      };
-      
-      // !!! ВАЖНО: Не указываем tradeSide для one-way-mode
-      
-      // Отправляем ордер
-      logger.info(`Отправка рыночного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
-      const response = await this.submitOrder(orderParams);
-      
-      if (response && response.code === '00000') {
-        logger.info(`Позиция ${symbol} успешно закрыта рыночным ордером: ${JSON.stringify(response.data)}`);
-      } else {
-        logger.warn(`Ошибка при закрытии позиции ${symbol} рыночным ордером: ${response ? response.msg : 'Unknown error'}`);
-      }
-      
-      return response;
-    } catch (error) {
-      logger.error(`Ошибка при закрытии позиции ${symbol}: ${error.message}`);
-      return { code: 'ERROR', msg: error.message };
-    }
-  }
-
-  async getTicker(symbol) {
-    try {
-      const response = await this.request('GET', '/api/v2/mix/market/ticker', { 
-        symbol, 
-        productType: "USDT-FUTURES" 
-      });
-      
-      if (!response) {
-        logger.warn(`Пустой ответ для getTicker ${symbol}`);
-        return { code: 'ERROR', msg: 'Пустой ответ', data: null };
-      }
-      
-      if (response.code && response.code !== '00000') {
-        logger.warn(`API ошибка getTicker: ${response.code} - ${response.msg}`);
-        return response;
-      }
-      
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        const dataItem = response.data[0];
-        if (dataItem.lastPr && !dataItem.last) {
-          dataItem.last = dataItem.lastPr;
-        }
-        return { code: '00000', data: dataItem };
-      } 
-      else if (response.data && typeof response.data === 'object') {
-        if (response.data.lastPr && !response.data.last) {
-          response.data.last = response.data.lastPr;
-        }
-        return response;
-      }
-      else if (response.ticker || response.tickers) {
-        const tickerData = response.ticker || (Array.isArray(response.tickers) ? response.tickers[0] : null);
-        if (tickerData) {
-          if (tickerData.lastPr && !tickerData.last) {
-            tickerData.last = tickerData.lastPr;
-          }
-          return { code: '00000', data: tickerData };
-        }
-      }
-      
-      if (response.last || response.price || response.lastPr || 
-          (response.data && (response.data.last || response.data.price || response.data.lastPr))) {
-        const lastPrice = response.last || response.price || response.lastPr || 
-                          (response.data && (response.data.last || response.data.price || response.data.lastPr));
-        return { code: '00000', data: { last: lastPrice } };
-      }
-      
-      return response;
-    } catch (error) {
-      logger.error(`Ошибка в getTicker: ${error.message}`);
-      throw error;
-    }
   }
 
   // Функция для форматирования цены с учетом минимального шага
@@ -696,7 +474,37 @@ class BitGetClient {
     return value.toString().split(".")[1].length || 0;
   }
 
-  // Исправленный метод размещения ордеров с поддержкой TP/SL при открытии позиции
+  /**
+   * Отправляет ордер на биржу согласно документации
+   * @param {Object} params - Параметры ордера
+   * @returns {Promise<Object>} - Ответ от API
+   */
+  async submitOrder(params) {
+    // Проверяем обязательные параметры
+    if (!params.timeInForceValue) {
+      // По умолчанию используем normal, если не указано
+      params.timeInForceValue = 'normal';
+    }
+    
+    const orderParams = {
+      ...params,
+      productType: "USDT-FUTURES"
+    };
+    
+    return this.request('POST', '/api/v2/mix/order/place-order', {}, orderParams);
+  }
+
+  /**
+   * Размещение обычного ордера
+   * @param {string} symbol - Символ торговой пары
+   * @param {string} side - Сторона (buy/sell)
+   * @param {string} orderType - Тип ордера (limit/market)
+   * @param {string|number} size - Размер позиции
+   * @param {string|number|null} price - Цена (только для limit ордеров)
+   * @param {boolean} reduceOnly - Только уменьшение позиции
+   * @param {string} tradeSide - Сторона торговли (open/close)
+   * @returns {Promise<Object>} - Результат размещения ордера
+   */
   async placeOrder(symbol, side, orderType, size, price = null, reduceOnly = false, tradeSide = "open") {
     if (!symbol) {
       const error = new Error('Для размещения ордера необходим символ');
@@ -736,12 +544,11 @@ class BitGetClient {
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal', // Обязательный параметр согласно документации
-        marginMode: 'isolated', // ИСПРАВЛЕНО: Добавлен обязательный параметр marginMode
+        marginMode: 'isolated', // Обязательный параметр marginMode
         productType: "USDT-FUTURES"
       };
 
-      // !!! ИСПРАВЛЕНО: Для one-way-mode не указываем tradeSide, только для hedge-mode
-      // Если это hedge-mode (мы используем tradeSide для открытия/закрытия)
+      // Для hedge-mode (мы используем tradeSide для открытия/закрытия)
       if (tradeSide !== "open" && tradeSide !== "close") {
         params.tradeSide = formattedTradeSide;
       }
@@ -776,7 +583,17 @@ class BitGetClient {
     }
   }
 
-  // Метод для размещения ордера с установкой TP/SL в одном запросе
+  /**
+   * Размещение ордера с установкой TP/SL в одном запросе
+   * @param {string} symbol - Символ торговой пары
+   * @param {string} side - Сторона (buy/sell)
+   * @param {string} orderType - Тип ордера (limit/market)
+   * @param {string|number} size - Размер позиции
+   * @param {string|number|null} price - Цена (только для limit ордеров)
+   * @param {string|number|null} takeProfitPrice - Цена для Take Profit
+   * @param {string|number|null} stopLossPrice - Цена для Stop Loss
+   * @returns {Promise<Object>} - Результат размещения ордера
+   */
   async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfitPrice = null, stopLossPrice = null) {
     if (!symbol) {
       const error = new Error('Для размещения ордера необходим символ');
@@ -856,17 +673,170 @@ class BitGetClient {
     }
   }
 
-  async getHistoricalOrders(symbol, startTime, endTime, pageSize = 100) {
-    return this.request('GET', '/api/v2/mix/order/history', {
-      symbol,
-      startTime,
-      endTime,
-      pageSize,
-      productType: "USDT-FUTURES"
-    });
+  /**
+   * Закрытие позиции по рыночной цене
+   * @param {string} symbol - Символ пары
+   * @param {string} marginCoin - Валюта маржи (обычно USDT)
+   * @returns {Promise<Object>} - Результат закрытия позиции
+   */
+  async closePosition(symbol, marginCoin = 'USDT') {
+    try {
+      if (!symbol) {
+        logger.error('Не указан символ для закрытия позиции');
+        return { code: 'ERROR', msg: 'Symbol is required' };
+      }
+      
+      logger.info(`Закрытие позиции по рыночной цене: ${symbol}`);
+      
+      // Получаем детали позиции для проверки
+      const positionResponse = await this.getPositionDetails(symbol);
+      
+      if (!positionResponse || !positionResponse.data) {
+        logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
+        return { code: 'ERROR', msg: `Position for ${symbol} not found` };
+      }
+      
+      const position = positionResponse.data;
+      
+      // Проверяем, что позиция существует и имеет размер
+      if (!position || !position.total || parseFloat(position.total) === 0) {
+        logger.warn(`Нет открытой позиции для ${symbol}`);
+        return { code: 'WARNING', msg: `No open position for ${symbol}` };
+      }
+      
+      // Определяем тип позиции
+      const holdSide = position.holdSide.toLowerCase();
+      
+      // Определяем противоположную сторону для закрытия
+      const side = holdSide === 'long' ? 'sell' : 'buy';
+      
+      // Получаем размер позиции
+      const size = position.available.toString();
+      
+      // Формируем параметры ордера для закрытия позиции
+      const orderParams = {
+        symbol,
+        marginCoin,
+        size,
+        side, // Противоположное направление текущей позиции
+        orderType: 'market', // Рыночный ордер для быстрого исполнения
+        timeInForceValue: 'normal',
+        marginMode: 'isolated', // Добавлен обязательный параметр marginMode
+        reduceOnly: "YES", // Указываем, что ордер должен только сокращать позицию
+        productType: "USDT-FUTURES"
+      };
+      
+      // Отправляем ордер
+      logger.info(`Отправка рыночного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
+      const response = await this.submitOrder(orderParams);
+      
+      if (response && response.code === '00000') {
+        logger.info(`Позиция ${symbol} успешно закрыта рыночным ордером: ${JSON.stringify(response.data)}`);
+      } else {
+        logger.warn(`Ошибка при закрытии позиции ${symbol} рыночным ордером: ${response ? response.msg : 'Unknown error'}`);
+      }
+      
+      return response;
+    } catch (error) {
+      logger.error(`Ошибка при закрытии позиции ${symbol}: ${error.message}`);
+      return { code: 'ERROR', msg: error.message };
+    }
   }
-  
-  // Исправленный метод для установки TP/SL
+
+  /**
+   * Закрытие позиции лимитным ордером
+   * @param {string} symbol - Символ пары
+   * @param {number|null} price - Цена закрытия (опционально)
+   * @returns {Promise<Object>} - Результат закрытия позиции
+   */
+  async closePositionWithLimit(symbol, price = null) {
+    try {
+      if (!symbol) {
+        logger.error('Не указан символ для закрытия позиции');
+        return { code: 'ERROR', msg: 'Symbol is required' };
+      }
+      
+      logger.info(`Закрытие позиции по лимитному ордеру: ${symbol}, цена=${price || 'рыночная'}`);
+      
+      // Получаем детали позиции для определения размера и типа
+      const positionResponse = await this.getPositionDetails(symbol);
+      
+      if (!positionResponse || !positionResponse.data) {
+        logger.warn(`Не удалось получить информацию о позиции ${symbol}`);
+        return { code: 'ERROR', msg: `Position for ${symbol} not found` };
+      }
+      
+      const position = positionResponse.data;
+      
+      // Проверяем, что позиция существует и имеет размер
+      if (!position || !position.total || parseFloat(position.total) === 0) {
+        logger.warn(`Нет открытой позиции для ${symbol}`);
+        return { code: 'ERROR', msg: `No open position for ${symbol}` };
+      }
+      
+      // Определяем тип позиции (long или short)
+      const holdSide = position.holdSide.toLowerCase();
+      
+      // В one-way-mode для закрытия необходимо указать противоположный side
+      const side = holdSide === 'long' ? 'sell' : 'buy';
+      const size = position.available.toString();
+      
+      // Если цена не указана, получаем текущую рыночную цену
+      let orderPrice = price;
+      if (!orderPrice) {
+        const ticker = await this.getTicker(symbol);
+        if (!ticker || !ticker.data || !ticker.data.last) {
+          logger.warn(`Не удалось получить текущую цену для ${symbol}`);
+          return { code: 'ERROR', msg: `Failed to get current price for ${symbol}` };
+        }
+        
+        // Устанавливаем цену с небольшим отклонением от рыночной для быстрого исполнения
+        const marketPrice = parseFloat(ticker.data.last);
+        orderPrice = holdSide === 'long' 
+            ? (marketPrice * 0.995).toFixed(position.pricePrecision || 4) // Чуть ниже рынка для быстрого закрытия LONG
+            : (marketPrice * 1.005).toFixed(position.pricePrecision || 4); // Чуть выше рынка для быстрого закрытия SHORT
+      }
+      
+      // Формируем параметры ордера
+      const orderParams = {
+        symbol,
+        marginCoin: 'USDT',
+        size,
+        price: orderPrice.toString(),
+        side, // Противоположное направление текущей позиции
+        orderType: 'limit',
+        timeInForceValue: 'normal',
+        marginMode: 'isolated', // Добавлен обязательный параметр marginMode
+        reduceOnly: "YES", // Указываем, что ордер должен только сокращать позицию
+        productType: "USDT-FUTURES"
+      };
+      
+      // Отправляем ордер
+      logger.info(`Отправка лимитного ордера на закрытие позиции ${symbol}: ${JSON.stringify(orderParams)}`);
+      const response = await this.submitOrder(orderParams);
+      
+      if (response && response.code === '00000') {
+        logger.info(`Позиция ${symbol} успешно закрыта лимитным ордером: ${JSON.stringify(response.data)}`);
+      } else {
+        logger.warn(`Ошибка при закрытии позиции ${symbol} лимитным ордером: ${response ? response.msg : 'Unknown error'}`);
+      }
+      
+      return response;
+    } catch (error) {
+      logger.error(`Ошибка при закрытии позиции лимитным ордером для ${symbol}: ${error.message}`);
+      return { code: 'ERROR', msg: error.message };
+    }
+  }
+
+  /**
+   * Установка TP/SL для существующей позиции
+   * @param {string} symbol - Символ пары
+   * @param {string} holdSide - Сторона позиции (LONG/SHORT)
+   * @param {string} planType - Тип плана (profit_plan/loss_plan)
+   * @param {string|number} triggerPrice - Цена срабатывания
+   * @param {string|number} size - Размер в контрактах
+   * @returns {Promise<Object>} - Результат установки TP/SL
+   */
   async setTpsl(symbol, holdSide, planType, triggerPrice, size) {
     try {
       // Проверяем и приводим holdSide к верхнему регистру
@@ -935,28 +905,14 @@ class BitGetClient {
     }
   }
 
-  // Метод для модификации существующего TP/SL
-  async modifyTpsl(symbol, holdSide, planType, triggerPrice) {
-    // ИСПРАВЛЕНО: Согласно документации https://www.bitget.com/api-doc/contract/plan/Modify-Tpsl-Order
-    // параметр tradeSide не требуется для эндпоинта modify-tpsl-order
-    const requestBody = {
-      symbol,
-      marginCoin: 'USDT',
-      planType, // "profit_plan" или "loss_plan"
-      triggerPrice: triggerPrice.toString(),
-      triggerPriceType: "mark_price",
-      holdSide, // "long" или "short"
-      productType: "USDT-FUTURES"
-    };
-    
-    if (this.debug) {
-      logger.info(`Модификация TP/SL: ${JSON.stringify(requestBody)}`);
-    }
-    
-    return this.request('POST', '/api/v2/mix/order/modify-tpsl-order', {}, requestBody);
-  }
-  
-  // Исправленный метод для установки трейлинг-стопа
+  /**
+   * Установка трейлинг-стопа для существующей позиции
+   * @param {string} symbol - Символ пары
+   * @param {string} holdSide - Сторона позиции (LONG/SHORT)
+   * @param {string|number} callbackRatio - Процент отката
+   * @param {string|number} size - Размер в контрактах
+   * @returns {Promise<Object>} - Результат установки трейлинг-стопа
+   */
   async setTrailingStop(symbol, holdSide, callbackRatio, size) {
     try {
       if (!symbol || !callbackRatio) {

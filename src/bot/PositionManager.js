@@ -1,4 +1,4 @@
-// src/bot/PositionManager.js - исправленная версия
+// src/bot/PositionManager.js - оптимизированная версия
 const EventEmitter = require('events');
 const logger = require('../utils/logger');
 
@@ -159,10 +159,6 @@ class PositionManager extends EventEmitter {
       if (takeProfitPrice || stopLossPrice) {
         logger.info(`Открытие позиции с TP=${takeProfitPrice} и SL=${stopLossPrice}`);
         
-        // Форматируем цены TP/SL если они заданы
-        const formattedTpPrice = takeProfitPrice ? parseFloat(takeProfitPrice).toString() : undefined;
-        const formattedSlPrice = stopLossPrice ? parseFloat(stopLossPrice).toString() : undefined;
-        
         // Используем специальный метод для размещения ордера с TP/SL
         orderResponse = await this.client.placeOrderWithTpSl(
           symbol,
@@ -170,8 +166,8 @@ class PositionManager extends EventEmitter {
           'market',
           formattedSize,
           null,
-          formattedTpPrice,
-          formattedSlPrice
+          takeProfitPrice,
+          stopLossPrice
         );
       } else {
         // Иначе используем обычный метод размещения ордера
@@ -228,7 +224,7 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  // ИСПРАВЛЕНО: Метод закрытия позиции по ID
+  // Исправленный метод закрытия позиции по ID
   async closePosition(positionId, percentage = 100) {
     try {
       percentage = percentage || 100;
@@ -319,7 +315,7 @@ class PositionManager extends EventEmitter {
     }
   }
 
-  // ИСПРАВЛЕНО: Метод для закрытия позиции по символу
+  // Метод для закрытия позиции по символу
   async closePositionBySymbol(symbol) {
     try {
       if (!symbol) {
@@ -455,7 +451,7 @@ class PositionManager extends EventEmitter {
     }
   }
   
-  // Обновленный метод для установки TP/SL
+  // Метод для установки TP/SL
   async setTpsl(symbol, type, takeProfitPrice, stopLossPrice) {
     try {
       // Проверяем параметры
@@ -465,10 +461,20 @@ class PositionManager extends EventEmitter {
       }
       
       // Определяем holdSide на основе типа позиции
-      const holdSide = type.toUpperCase() === 'LONG' ? 'long' : 'short';
+      const holdSide = type.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT';
       
       let tpSuccess = true;
       let slSuccess = true;
+      
+      // Находим позицию для получения размера
+      const position = this.openPositions.find(p => p.symbol === symbol);
+      if (!position) {
+        logger.warn(`Не найдена позиция для ${symbol}`);
+        return false;
+      }
+      
+      // Размер позиции в контрактах
+      const size = position.size.toFixed(5);
       
       // Если указан Take Profit, устанавливаем его
       if (takeProfitPrice) {
@@ -478,7 +484,7 @@ class PositionManager extends EventEmitter {
             holdSide,
             'profit_plan',
             takeProfitPrice,
-            '100'  // 100% позиции
+            size
           );
           
           if (!tpResponse || tpResponse.code !== '00000') {
@@ -501,7 +507,7 @@ class PositionManager extends EventEmitter {
             holdSide,
             'loss_plan',
             stopLossPrice,
-            '100'  // 100% позиции
+            size
           );
           
           if (!slResponse || slResponse.code !== '00000') {
@@ -523,129 +529,51 @@ class PositionManager extends EventEmitter {
     }
   }
   
-  // Обновленный метод для установки трейлинг-стопа
+  // Метод для установки трейлинг-стопа
   async setTrailingStop(symbol, type, callbackRatio) {
-  try {
-    if (!symbol || !callbackRatio) {
-      logger.error('Для установки трейлинг-стопа необходимы символ и callbackRatio');
-      return false;
-    }
-    
-    // Находим позицию для получения размера
-    const position = this.openPositions.find(p => p.symbol === symbol);
-    if (!position) {
-      logger.warn(`Не найдена позиция для ${symbol}`);
-      return false;
-    }
-    
-    // Приводим тип позиции к верхнему регистру для API
-    const holdSide = type.toUpperCase();
-    
-    // Размер позиции в контрактах
-    const size = position.size.toFixed(5);
-    
     try {
-      const response = await this.client.setTrailingStop(
-        symbol,
-        holdSide,            // В верхнем регистре для API
-        callbackRatio.toString(),  // Значение должно быть строкой
-        size
-      );
-      
-      if (!response || response.code !== '00000') {
-        logger.warn(`Не удалось установить трейлинг-стоп: ${response ? response.msg : 'Нет ответа от API'}`);
+      if (!symbol || !callbackRatio) {
+        logger.error('Для установки трейлинг-стопа необходимы символ и callbackRatio');
         return false;
       }
       
-      logger.info(`Трейлинг-стоп установлен для ${symbol} с отступом ${callbackRatio}%`);
-      return true;
+      // Находим позицию для получения размера
+      const position = this.openPositions.find(p => p.symbol === symbol);
+      if (!position) {
+        logger.warn(`Не найдена позиция для ${symbol}`);
+        return false;
+      }
+      
+      // Приводим тип позиции к верхнему регистру для API
+      const holdSide = type.toUpperCase();
+      
+      // Размер позиции в контрактах
+      const size = position.size.toFixed(5);
+      
+      try {
+        const response = await this.client.setTrailingStop(
+          symbol,
+          holdSide,            // В верхнем регистре для API
+          callbackRatio.toString(),  // Значение должно быть строкой
+          size
+        );
+        
+        if (!response || response.code !== '00000') {
+          logger.warn(`Не удалось установить трейлинг-стоп: ${response ? response.msg : 'Нет ответа от API'}`);
+          return false;
+        }
+        
+        logger.info(`Трейлинг-стоп установлен для ${symbol} с отступом ${callbackRatio}%`);
+        return true;
+      } catch (error) {
+        logger.error(`Ошибка при установке трейлинг-стопа: ${error.message}`);
+        return false;
+      }
     } catch (error) {
       logger.error(`Ошибка при установке трейлинг-стопа: ${error.message}`);
       return false;
     }
-  } catch (error) {
-    logger.error(`Ошибка при установке трейлинг-стопа: ${error.message}`);
-    return false;
   }
-}
-
-// Исправленный метод для установки TP/SL
-async setTpsl(symbol, type, takeProfitPrice, stopLossPrice) {
-  try {
-    // Проверяем параметры
-    if (!symbol) {
-      logger.error('Для установки TP/SL необходим символ');
-      return false;
-    }
-    
-    // Приводим тип позиции к верхнему регистру для API
-    const holdSide = type.toUpperCase();
-    
-    let tpSuccess = true;
-    let slSuccess = true;
-    
-    // Находим позицию для получения размера
-    const position = this.openPositions.find(p => p.symbol === symbol);
-    if (!position) {
-      logger.warn(`Не найдена позиция для ${symbol}`);
-      return false;
-    }
-    
-    // Размер позиции в контрактах
-    const size = position.size.toFixed(5);
-    
-    // Если указан Take Profit, устанавливаем его
-    if (takeProfitPrice) {
-      try {
-        const tpResponse = await this.client.setTpsl(
-          symbol,
-          holdSide,
-          'profit_plan',
-          takeProfitPrice,
-          size
-        );
-        
-        if (!tpResponse || tpResponse.code !== '00000') {
-          logger.warn(`Не удалось установить Take Profit: ${tpResponse ? tpResponse.msg : 'Нет ответа от API'}`);
-          tpSuccess = false;
-        } else {
-          logger.info(`Take Profit установлен для ${symbol} на уровне ${takeProfitPrice}`);
-        }
-      } catch (tpError) {
-        logger.error(`Ошибка при установке Take Profit: ${tpError.message}`);
-        tpSuccess = false;
-      }
-    }
-    
-    // Если указан Stop Loss, устанавливаем его
-    if (stopLossPrice) {
-      try {
-        const slResponse = await this.client.setTpsl(
-          symbol,
-          holdSide,
-          'loss_plan',
-          stopLossPrice,
-          size
-        );
-        
-        if (!slResponse || slResponse.code !== '00000') {
-          logger.warn(`Не удалось установить Stop Loss: ${slResponse ? slResponse.msg : 'Нет ответа от API'}`);
-          slSuccess = false;
-        } else {
-          logger.info(`Stop Loss установлен для ${symbol} на уровне ${stopLossPrice}`);
-        }
-      } catch (slError) {
-        logger.error(`Ошибка при установке Stop Loss: ${slError.message}`);
-        slSuccess = false;
-      }
-    }
-    
-    return tpSuccess || slSuccess;
-  } catch (error) {
-    logger.error(`Ошибка при установке TP/SL: ${error.message}`);
-    return false;
-  }
-}
   
   async updateTrailingStops() {
     try {
@@ -719,6 +647,3 @@ async setTpsl(symbol, type, takeProfitPrice, stopLossPrice) {
 }
 
 module.exports = PositionManager;
-
-
-

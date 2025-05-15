@@ -1,13 +1,27 @@
-// 3. Обновим performanceController.js для получения реальной производительности
-// src/api/controllers/performanceController.js
+// src/api/controllers/performanceController.js - обновленная версия
 const logger = require('../../utils/logger');
 const dataStore = require('../../utils/dataStore');
 const { getBot } = require('../../bot/setup');
+const serviceManager = require('../../services/ServiceManager');
 
 exports.getPerformance = function(req, res) {
   try {
     const date = req.query.date;
     
+    // ИЗМЕНЕНО: Сначала пытаемся получить данные из ServiceManager
+    if (!date) {
+      const performanceData = serviceManager.getStats();
+      
+      if (performanceData) {
+        return res.json({
+          success: true,
+          data: performanceData
+        });
+      }
+    }
+    
+    // Если ServiceManager не вернул данные или запрашивается конкретная дата,
+    // используем стандартный метод из dataStore
     const performanceData = dataStore.getPerformanceData(date);
     
     if (date && !performanceData) {
@@ -34,9 +48,17 @@ exports.getPnlData = function(req, res) {
   try {
     const days = parseInt(req.query.days) || 7;
     
-    const pnlData = dataStore.getPnlData(days);
+    // ИЗМЕНЕНО: Сначала пытаемся получить данные из ServiceManager
+    const pnlData = serviceManager.getPnlData(days);
     
-    return res.json(pnlData);
+    if (pnlData && pnlData.length > 0) {
+      return res.json(pnlData);
+    }
+    
+    // Если ServiceManager не вернул данные, используем стандартный метод из dataStore
+    const fallbackPnlData = dataStore.getPnlData(days);
+    
+    return res.json(fallbackPnlData);
   } catch (error) {
     logger.error('Ошибка получения данных о PnL: ' + error.message);
     return res.status(500).json({
@@ -48,6 +70,23 @@ exports.getPnlData = function(req, res) {
 
 exports.getBalanceHistory = async function(req, res) {
   try {
+    const days = parseInt(req.query.days) || 30;
+    
+    // ИЗМЕНЕНО: Получаем историю баланса из ServiceManager
+    const serviceManagerBalanceHistory = serviceManager.isInitialized 
+      ? serviceManager.getPnlData(days).map(item => ({
+          date: item.date,
+          balance: item.balance || 0,
+          profit: item.profit || 0,
+          profitPercentage: item.pnl || 0
+        }))
+      : null;
+    
+    if (serviceManagerBalanceHistory && serviceManagerBalanceHistory.length > 0) {
+      return res.json(serviceManagerBalanceHistory);
+    }
+    
+    // Если ServiceManager не вернул данные, пытаемся получить из бота
     const tradingBot = getBot();
     
     if (!tradingBot || !tradingBot.client) {
@@ -77,8 +116,20 @@ exports.getBalanceHistory = async function(req, res) {
 
 exports.getTradeHistory = async function(req, res) {
   try {
-    const tradingBot = getBot();
     const limit = parseInt(req.query.limit) || 20;
+    const symbol = req.query.symbol || null;
+    
+    // ИЗМЕНЕНО: Получаем историю сделок из ServiceManager
+    const serviceManagerTradeHistory = serviceManager.isInitialized 
+      ? serviceManager.getTradeHistory(limit, symbol)
+      : null;
+    
+    if (serviceManagerTradeHistory && serviceManagerTradeHistory.length > 0) {
+      return res.json(serviceManagerTradeHistory);
+    }
+    
+    // Если ServiceManager не вернул данные, пытаемся получить из бота
+    const tradingBot = getBot();
     
     if (!tradingBot || !tradingBot.client) {
       const cachedHistory = dataStore.get('tradeHistory') || [];
@@ -93,10 +144,13 @@ exports.getTradeHistory = async function(req, res) {
       
       let allTrades = [];
       
-      for (const symbol of tradingBot.config.tradingPairs) {
+      for (const symbolToCheck of tradingBot.config.tradingPairs) {
+        // Если задан конкретный символ, фильтруем
+        if (symbol && symbolToCheck !== symbol) continue;
+        
         try {
           const historyResponse = await tradingBot.client.getHistoricalOrders(
-            symbol, 
+            symbolToCheck, 
             thirtyDaysAgo.toString(), 
             now.toString(), 
             100
@@ -119,7 +173,7 @@ exports.getTradeHistory = async function(req, res) {
             allTrades = allTrades.concat(trades);
           }
         } catch (err) {
-          logger.warn(`Не удалось получить историю сделок для ${symbol}: ${err.message}`);
+          logger.warn(`Не удалось получить историю сделок для ${symbolToCheck}: ${err.message}`);
         }
       }
       

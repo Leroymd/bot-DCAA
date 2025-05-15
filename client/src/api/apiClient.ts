@@ -1,4 +1,4 @@
-// client/src/api/apiClient.ts - исправленная версия
+// client/src/api/apiClient.ts - обновленная версия с добавленными методами
 import axios from 'axios';
 import { 
   BotStatus, 
@@ -50,6 +50,16 @@ export const api = {
     stop: async (): Promise<ApiResponse> => {
       const response = await apiClient.post<ApiResponse>('/bot/stop');
       return response.data;
+    },
+    // Новый метод для получения логов
+    getLogs: async (limit: number = 100): Promise<any[]> => {
+      try {
+        const response = await apiClient.get<DataResponse<any[]>>(`/bot/logs?limit=${limit}`);
+        return response.data.data || [];
+      } catch (error) {
+        console.error('Error getting logs:', error);
+        return [];
+      }
     }
   },
   
@@ -103,6 +113,16 @@ export const api = {
     getPerformance: async (): Promise<any> => {
       const response = await apiClient.get<DataResponse<any>>('/performance/data');
       return response.data.data;
+    },
+    // Новый метод для получения истории баланса
+    getBalanceHistory: async (): Promise<any[]> => {
+      try {
+        const response = await apiClient.get<any[]>('/performance/balance');
+        return response.data;
+      } catch (error) {
+        console.error('Error getting balance history:', error);
+        return [];
+      }
     }
   },
   

@@ -1,7 +1,40 @@
-// src/api/controllers/positionController.js - исправленная версия
+// src/api/controllers/positionController.js - оптимизированная версия
 const logger = require('../../utils/logger');
 const { getBot } = require('../../bot/setup');
 
+/**
+ * Получение активных позиций
+ */
+exports.getActivePositions = async function(req, res) {
+  try {
+    const tradingBot = getBot();
+    
+    if (!tradingBot || !tradingBot.positionManager) {
+      return res.status(500).json({
+        success: false,
+        message: 'Торговый бот не инициализирован или отсутствует менеджер позиций'
+      });
+    }
+    
+    // Обновляем и получаем текущие открытые позиции
+    const positions = await tradingBot.positionManager.updateOpenPositions();
+    
+    return res.json({
+      success: true,
+      data: positions
+    });
+  } catch (error) {
+    logger.error(`Ошибка при получении активных позиций: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Открытие новой позиции
+ */
 exports.openPosition = async function(req, res) {
   try {
     const tradingBot = getBot();
@@ -125,6 +158,9 @@ exports.openPosition = async function(req, res) {
   }
 };
 
+/**
+ * Закрытие позиции
+ */
 exports.closePosition = async function(req, res) {
   try {
     const tradingBot = getBot();
@@ -162,7 +198,7 @@ exports.closePosition = async function(req, res) {
       });
     }
     
-    // ИСПРАВЛЕНО: Получаем дополнительную информацию о позиции перед закрытием
+    // Получаем дополнительную информацию о позиции перед закрытием
     let positionInfo = null;
     
     // Если известен ID позиции, но не символ, пытаемся найти символ по ID
@@ -247,34 +283,9 @@ exports.closePosition = async function(req, res) {
   }
 };
 
-exports.getActivePositions = async function(req, res) {
-  try {
-    const tradingBot = getBot();
-    
-    if (!tradingBot || !tradingBot.positionManager) {
-      return res.status(500).json({
-        success: false,
-        message: 'Торговый бот не инициализирован или отсутствует менеджер позиций'
-      });
-    }
-    
-    // Обновляем и получаем текущие открытые позиции
-    const positions = await tradingBot.positionManager.updateOpenPositions();
-    
-    return res.json({
-      success: true,
-      data: positions
-    });
-  } catch (error) {
-    logger.error(`Ошибка при получении активных позиций: ${error.message}`);
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Метод для установки TP/SL
+/**
+ * Установка TP/SL для существующей позиции
+ */
 exports.setTpsl = async function(req, res) {
   try {
     const tradingBot = getBot();
@@ -303,73 +314,20 @@ exports.setTpsl = async function(req, res) {
       });
     }
     
-    // Приводим holdSide к верхнему регистру для соблюдения требований API
-    const formattedHoldSide = holdSide.toUpperCase();
+    // Приводим holdSide к правильному формату (LONG/SHORT)
+    const type = holdSide.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT';
     
-    logger.info(`Запрос на установку TP/SL: ${symbol}, ${formattedHoldSide}, TP=${takeProfitPrice}, SL=${stopLossPrice}`);
+    logger.info(`Запрос на установку TP/SL: ${symbol}, ${type}, TP=${takeProfitPrice}, SL=${stopLossPrice}`);
     
-    let tpSuccess = true;
-    let slSuccess = true;
+    // Используем метод из positionManager
+    const result = await tradingBot.positionManager.setTpsl(
+      symbol,
+      type,
+      takeProfitPrice ? parseFloat(takeProfitPrice) : null,
+      stopLossPrice ? parseFloat(stopLossPrice) : null
+    );
     
-    // Получаем информацию о позиции для определения размера
-    const positionDetails = await tradingBot.client.getPositionDetails(symbol);
-    if (!positionDetails || !positionDetails.data) {
-      return res.status(404).json({
-        success: false,
-        message: `Не найдена открытая позиция для ${symbol}`
-      });
-    }
-    
-    const position = positionDetails.data;
-    const positionSize = position.available || position.total; // Размер позиции
-    
-    // Если указан Take Profit, устанавливаем его
-    if (takeProfitPrice) {
-      try {
-        const tpResponse = await tradingBot.client.setTpsl(
-          symbol,
-          formattedHoldSide, // Используем верхний регистр
-          'profit_plan',
-          takeProfitPrice,
-          positionSize
-        );
-        
-        if (!tpResponse || tpResponse.code !== '00000') {
-          logger.warn(`Не удалось установить Take Profit: ${tpResponse ? tpResponse.msg : 'Нет ответа от API'}`);
-          tpSuccess = false;
-        } else {
-          logger.info(`Take Profit установлен для ${symbol} на уровне ${takeProfitPrice}`);
-        }
-      } catch (tpError) {
-        logger.error(`Ошибка при установке Take Profit: ${tpError.message}`);
-        tpSuccess = false;
-      }
-    }
-    
-    // Если указан Stop Loss, устанавливаем его
-    if (stopLossPrice) {
-      try {
-        const slResponse = await tradingBot.client.setTpsl(
-          symbol,
-          formattedHoldSide, // Используем верхний регистр
-          'loss_plan',
-          stopLossPrice,
-          positionSize
-        );
-        
-        if (!slResponse || slResponse.code !== '00000') {
-          logger.warn(`Не удалось установить Stop Loss: ${slResponse ? slResponse.msg : 'Нет ответа от API'}`);
-          slSuccess = false;
-        } else {
-          logger.info(`Stop Loss установлен для ${symbol} на уровне ${stopLossPrice}`);
-        }
-      } catch (slError) {
-        logger.error(`Ошибка при установке Stop Loss: ${slError.message}`);
-        slSuccess = false;
-      }
-    }
-    
-    if (!tpSuccess && !slSuccess) {
+    if (!result) {
       return res.status(500).json({
         success: false,
         message: 'Не удалось установить TP/SL'
@@ -389,7 +347,9 @@ exports.setTpsl = async function(req, res) {
   }
 };
 
-// Метод для установки трейлинг-стопа
+/**
+ * Установка трейлинг-стопа для существующей позиции
+ */
 exports.setTrailingStop = async function(req, res) {
   try {
     const tradingBot = getBot();
@@ -410,35 +370,22 @@ exports.setTrailingStop = async function(req, res) {
       });
     }
     
-    // Приводим holdSide к верхнему регистру для соблюдения требований API
-    const formattedHoldSide = holdSide.toUpperCase();
+    // Приводим holdSide к правильному формату (LONG/SHORT)
+    const type = holdSide.toUpperCase() === 'LONG' ? 'LONG' : 'SHORT';
     
-    logger.info(`Запрос на установку трейлинг-стопа: ${symbol}, ${formattedHoldSide}, callbackRatio=${callbackRatio}`);
+    logger.info(`Запрос на установку трейлинг-стопа: ${symbol}, ${type}, callbackRatio=${callbackRatio}`);
     
-    // Получаем информацию о позиции для определения размера
-    const positionDetails = await tradingBot.client.getPositionDetails(symbol);
-    if (!positionDetails || !positionDetails.data) {
-      return res.status(404).json({
-        success: false,
-        message: `Не найдена открытая позиция для ${symbol}`
-      });
-    }
-    
-    const position = positionDetails.data;
-    const positionSize = position.available || position.total; // Размер позиции
-    
-    const result = await tradingBot.client.setTrailingStop(
+    // Используем метод из positionManager
+    const result = await tradingBot.positionManager.setTrailingStop(
       symbol,
-      formattedHoldSide, // Используем верхний регистр
-      callbackRatio,
-      positionSize
+      type,
+      parseFloat(callbackRatio)
     );
     
-    if (!result || result.code !== '00000') {
-      logger.warn(`Не удалось установить трейлинг-стоп: ${result ? result.msg : 'Нет ответа от API'}`);
+    if (!result) {
       return res.status(500).json({
         success: false,
-        message: `Не удалось установить трейлинг-стоп: ${result ? result.msg : 'Ошибка API'}`
+        message: 'Не удалось установить трейлинг-стоп'
       });
     }
     
