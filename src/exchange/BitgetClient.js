@@ -276,12 +276,139 @@ class BitGetClient {
   }
 
   async getPositions(symbol, marginCoin = 'USDT') {
-    const params = { productType: "USDT-FUTURES" };
-    if (symbol) params.symbol = symbol;
-    return this.request('GET', '/api/v2/mix/position/all-position', params);
+    try {
+      logger.debug(`Запрос открытых позиций: symbol=${symbol || 'all'}, marginCoin=${marginCoin}`);
+      
+      const params = { 
+        productType: "USDT-FUTURES",
+        marginCoin: marginCoin
+      };
+      
+      if (symbol) {
+        params.symbol = symbol;
+      }
+      
+      const response = await this.request('GET', '/api/v2/mix/position/all-position', params);
+      
+      if (response && response.code === '00000' && response.data) {
+        logger.debug(`Получено ${response.data.length} позиций от API`);
+        
+        // Логируем первую позицию для анализа структуры
+        if (response.data.length > 0) {
+          logger.debug(`Пример структуры позиции: ${JSON.stringify(response.data[0])}`);
+          
+          // Проверяем поля с ценой входа
+          const position = response.data[0];
+          const priceFields = ['openPriceAvg', 'openPrice', 'openPr', 'entryPrice', 'avgPrice', 'avgPr', 'markPrice'];
+          
+          logger.debug('Поля с ценой в первой позиции:');
+          for (const field of priceFields) {
+            if (position[field] !== undefined) {
+              logger.debug(`- ${field}: ${position[field]}`);
+            }
+          }
+          
+          // Выводим все поля, связанные с временем, для первой позиции
+          const timeFields = ['cTime', 'ctime', 'createdAt', 'createTime', 'timestamp', 'uTime', 'updateTime'];
+          
+          logger.debug('Поля времени в первой позиции:');
+          for (const field of timeFields) {
+            if (position[field] !== undefined) {
+              logger.debug(`- ${field}: ${position[field]}`);
+            }
+          }
+        }
+        
+        // Добавляем обработку даты и времени для всех позиций
+        const processedPositions = response.data.map(position => {
+          // Если в ответе нет поля cTime или других полей времени,
+          // добавим поле entryTime с текущим временем в миллисекундах
+          const currentTime = Date.now();
+          
+          // Попытка найти любое поле времени в ответе API
+          let entryTimeMs = null;
+          
+          // Приоритетные поля для времени создания позиции
+          const timeFields = ['cTime', 'createdAt', 'createTime', 'ctime', 'timestamp', 'uTime'];
+          
+          for (const field of timeFields) {
+            if (position[field] !== undefined) {
+              const timeValue = position[field];
+              
+              // Определяем формат времени и конвертируем в миллисекунды
+              if (typeof timeValue === 'string') {
+                if (timeValue.length === 13) {
+                  entryTimeMs = parseInt(timeValue, 10);
+                } else if (timeValue.length === 10) {
+                  entryTimeMs = parseInt(timeValue, 10) * 1000;
+                } else if (timeValue.includes('T') || timeValue.includes('-')) {
+                  entryTimeMs = new Date(timeValue).getTime();
+                } else {
+                  const parsed = parseInt(timeValue, 10);
+                  entryTimeMs = !isNaN(parsed) ? 
+                    (parsed > 1700000000000 ? parsed : parsed * 1000) : 
+                    currentTime;
+                }
+              } else if (typeof timeValue === 'number') {
+                entryTimeMs = timeValue > 1700000000000 ? timeValue : timeValue * 1000;
+              }
+              
+              break; // Используем первое найденное поле времени
+            }
+          }
+          
+          // Если ни одно поле времени не найдено, используем текущее время
+          if (entryTimeMs === null) {
+            entryTimeMs = currentTime;
+          }
+          
+          // Проверяем возможные поля для цены входа
+          let entryPrice = null;
+          const priceFields = ['openPriceAvg', 'openPrice', 'openPr', 'entryPrice', 'avgPrice', 'avgPr', 'markPrice'];
+          
+          for (const field of priceFields) {
+            if (position[field] !== undefined && !isNaN(parseFloat(position[field]))) {
+              entryPrice = parseFloat(position[field]);
+              break;
+            }
+          }
+          
+          // Для отладки логируем обработанное время и цену
+          logger.debug(`Позиция ${position.symbol}: время=${new Date(entryTimeMs).toISOString()}, цена входа=${entryPrice}`);
+          
+          // Возвращаем объект позиции с добавленными полями entryTime и entryPrice
+          return {
+            ...position,
+            entryTime: entryTimeMs,
+            processedEntryPrice: entryPrice // Добавляем обработанную цену под новым именем
+          };
+        });
+        
+        // Возвращаем модифицированный ответ с обработанными позициями
+        return {
+          ...response,
+          data: processedPositions
+        };
+      }
+      
+      // Если ответ пустой или содержит ошибку
+      if (!response || response.code !== '00000') {
+        logger.warn(`Ошибка при получении позиций: ${response ? response.msg || response.code : 'Нет ответа от API'}`);
+      }
+      
+      return response;
+    } catch (error) {
+      logger.error(`Ошибка в getPositions: ${error.message}`);
+      
+      if (error.response) {
+        logger.error(`Детали ошибки API: ${JSON.stringify(error.response.data || {})}`);
+      }
+      
+      throw error;
+    }
   }
 
-  // Улучшенный метод для получения детальной информации о позиции
+  // Улучшенный метод для получения деталей позиции
   async getPositionDetails(symbol) {
     try {
       if (!symbol) {
@@ -304,6 +431,9 @@ class BitGetClient {
         return null;
       }
       
+      // Логируем полный ответ для отладки
+      logger.debug(`Полный ответ API для ${symbol}: ${JSON.stringify(response.data)}`);
+      
       // Ищем нужную позицию среди полученных
       const position = response.data.find(p => p.symbol === symbol);
       
@@ -312,20 +442,64 @@ class BitGetClient {
         return null;
       }
       
-      // Дополнительно получаем текущую рыночную цену
-      const ticker = await this.getTicker(symbol);
-      const marketPrice = ticker && ticker.data && ticker.data.last 
-          ? parseFloat(ticker.data.last) 
-          : null;
+      // Проверяем поля с ценой входа
+      let entryPrice = null;
+      const priceFields = ['openPriceAvg', 'openPrice', 'openPr', 'entryPrice', 'avgPrice', 'avgPr'];
       
-      // Добавляем рыночную цену к информации о позиции
+      for (const field of priceFields) {
+        if (position[field] !== undefined && !isNaN(parseFloat(position[field]))) {
+          entryPrice = parseFloat(position[field]);
+          logger.debug(`Найдено поле с ценой входа: ${field} = ${entryPrice}`);
+          break;
+        }
+      }
+      
+      // Если не нашли цену входа напрямую, пробуем альтернативный подход через другие поля
+      if (entryPrice === null) {
+        logger.warn(`Не найдено явное поле с ценой входа для ${symbol}`);
+        
+        // Можно попробовать вычислить из других доступных полей, например:
+        if (position.notionalUsd && position.total && parseFloat(position.total) > 0) {
+          entryPrice = parseFloat(position.notionalUsd) / parseFloat(position.total);
+          logger.debug(`Вычислена цена входа из notionalUsd/total: ${entryPrice}`);
+        } else {
+          // В крайнем случае используем markPrice
+          if (position.markPrice) {
+            entryPrice = parseFloat(position.markPrice);
+            logger.debug(`Используем markPrice как запасной вариант: ${entryPrice}`);
+          }
+        }
+      }
+      
+      // Дополнительно получаем текущую рыночную цену
+      let marketPrice = null;
+      try {
+        const ticker = await this.getTicker(symbol);
+        marketPrice = ticker && ticker.data && ticker.data.last 
+            ? parseFloat(ticker.data.last) 
+            : null;
+        
+        logger.debug(`Получена текущая рыночная цена для ${symbol}: ${marketPrice}`);
+      } catch (tickerError) {
+        logger.warn(`Ошибка при получении текущей цены для ${symbol}: ${tickerError.message}`);
+      }
+      
+      // Если не удалось получить маркет-цену, но есть markPrice в позиции, используем его
+      if (marketPrice === null && position.markPrice) {
+        marketPrice = parseFloat(position.markPrice);
+        logger.debug(`Используем markPrice вместо рыночной цены: ${marketPrice}`);
+      }
+      
+      // Добавляем к позиции цену входа и текущую рыночную цену
       const enhancedPosition = {
         ...position,
-        marketPrice,
-        positionValue: marketPrice ? parseFloat(position.total) * marketPrice : null
+        entryPrice, // Явно указываем найденную или вычисленную цену входа
+        marketPrice, // Текущая рыночная цена
+        positionValue: marketPrice && position.total ? parseFloat(position.total) * marketPrice : null
       };
       
       logger.info(`Детали позиции для ${symbol} получены успешно`);
+      logger.debug(`Итоговые детали: entryPrice=${entryPrice}, marketPrice=${marketPrice}`);
       
       return {
         code: '00000',
@@ -711,6 +885,7 @@ class BitGetClient {
         }
       }
 
+      // ИСПРАВЛЕНИЕ: Параметры ордера согласно актуальной документации Bitget
       const params = {
         symbol,
         marginCoin: 'USDT',
@@ -727,13 +902,15 @@ class BitGetClient {
         params.price = formattedPrice.toString();
       }
 
-      // Добавляем TP/SL если они заданы
+      // ИСПРАВЛЕНИЕ: Правильные параметры для TP/SL согласно актуальной документации
       if (formattedTpPrice) {
-        params.presetTakeProfitPrice = formattedTpPrice.toString();
+        params.tpTriggerPrice = formattedTpPrice.toString();
+        params.tpPriceType = "lastPrice";
       }
       
       if (formattedSlPrice) {
-        params.presetStopLossPrice = formattedSlPrice.toString();
+        params.slTriggerPrice = formattedSlPrice.toString();
+        params.slPriceType = "lastPrice";
       }
 
       if (this.debug) {

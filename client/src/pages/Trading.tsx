@@ -1,4 +1,4 @@
-// client/src/pages/Trading.tsx - полная версия с исправлениями
+// client/src/pages/Trading.tsx - полная исправленная версия
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, X, Settings } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -49,6 +49,57 @@ const Trading: React.FC = () => {
     const interval = setInterval(fetchPositions, 15000);
     return () => clearInterval(interval);
   }, []);
+  
+  // Исправленный метод форматирования времени, корректно обрабатывающий невалидные данные
+  const formatTime = (timeValue: any): string => {
+    try {
+      // Если значение отсутствует или равно 'NaN:NaN', вернем безопасное дефолтное значение
+      if (!timeValue || timeValue === 'NaN:NaN') {
+        return '00:00';
+      }
+
+      // Если это уже отформатированная строка в формате мм:сс, просто вернем её
+      if (typeof timeValue === 'string' && timeValue.match(/^\d{2}:\d{2}$/)) {
+        return timeValue;
+      }
+
+      // Преобразуем строковое или числовое представление в число
+      let timestampMs: number;
+      
+      if (typeof timeValue === 'string') {
+        // Если это строка, преобразуем в число
+        timestampMs = parseInt(timeValue, 10);
+      } else if (typeof timeValue === 'number') {
+        // Если это уже число, используем как есть
+        timestampMs = timeValue;
+      } else {
+        // Для других типов вернем дефолтное значение
+        return '00:00';
+      }
+
+      // Проверяем валидность преобразования
+      if (isNaN(timestampMs) || timestampMs <= 0) {
+        return '00:00';
+      }
+
+      // Создаем объект Date
+      const date = new Date(timestampMs);
+      
+      // Проверяем валидность созданного объекта Date
+      if (isNaN(date.getTime())) {
+        return '00:00';
+      }
+
+      // Форматируем с ведущими нулями для обеспечения стабильного отображения
+      const minutes = Math.floor(timestampMs / 60000);
+      const seconds = Math.floor((timestampMs % 60000) / 1000);
+      
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return '00:00'; // В случае любой ошибки возвращаем безопасное значение
+    }
+  };
   
   const closePosition = async (positionId: string) => {
     try {
@@ -411,7 +462,8 @@ const Trading: React.FC = () => {
                         {position.profit && position.profit >= 0 ? '+' : ''}{position.profit?.toFixed(2) || '0.00'}%
                       </td>
                       <td className="p-4">
-                        {position.time && position.time !== 'NaN:NaN' ? position.time : '00:00'}
+                        {/* Используем улучшенное форматирование времени */}
+                        {formatTime(position.time)}
                       </td>
                       <td className="p-4 flex items-center space-x-2">
                         <button 

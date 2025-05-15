@@ -41,7 +41,9 @@ class PositionManager extends EventEmitter {
     logger.info(`Конфигурация PositionManager обновлена: maxTradeDurationMinutes=${this.config.maxTradeDurationMinutes}`);
   }
 
- async updateOpenPositions() {
+ // Улучшенный метод updateOpenPositions для PositionManager.js с исправлением 
+// отображения цены входа в сделку и улучшенным логированием
+async updateOpenPositions() {
   try {
     // Обновляем цены для всех торгуемых пар
     for (const symbol of this.config.tradingPairs) {
@@ -76,6 +78,31 @@ class PositionManager extends EventEmitter {
       if (parseFloat(position.total) > 0) {
         // Логируем каждую позицию для отладки
         logger.debug('Обработка позиции: ' + JSON.stringify(position));
+        
+        // Проверяем возможные поля для цены входа
+        let entryPrice = 0;
+        const possiblePriceFields = ['openPrice', 'openPr', 'entryPrice', 'avgPrice', 'avgPr', 'markPrice', 'markPr'];
+        
+        for (const field of possiblePriceFields) {
+          if (position[field] !== undefined && !isNaN(parseFloat(position[field]))) {
+            entryPrice = parseFloat(position[field]);
+            logger.debug(`Используем поле ${field} для цены входа: ${entryPrice}`);
+            break;
+          }
+        }
+        
+        // Если не нашли цену входа, используем запасной вариант - markPrice или текущую цену
+        if (entryPrice === 0) {
+          if (position.markPrice && !isNaN(parseFloat(position.markPrice))) {
+            entryPrice = parseFloat(position.markPrice);
+            logger.warn(`Не найдена цена входа, используем markPrice: ${entryPrice}`);
+          } else if (this.currentPrices[position.symbol]) {
+            entryPrice = this.currentPrices[position.symbol];
+            logger.warn(`Не найдена цена входа, используем текущую цену: ${entryPrice}`);
+          } else {
+            logger.error(`Не удалось определить цену входа для позиции ${position.symbol}`);
+          }
+        }
         
         // ИСПРАВЛЕНИЕ: ищем правильное поле времени в разных форматах
         // Bitget может использовать различные имена полей: createdAt, cTime, ctime, timestamp, uTime
@@ -142,17 +169,35 @@ class PositionManager extends EventEmitter {
         
         logger.debug(`Итоговое время для позиции ${position.symbol}: ${new Date(entryTimeMs).toISOString()}`);
         
+        // Проверка наличия и парсинг значения unrealizedPL
+        let pnl = 0;
+        let pnlPercentage = 0;
+        
+        // Возможные поля для PNL
+        const possiblePnlFields = ['unrealizedPL', 'unrealizedPnl', 'pnl', 'profit'];
+        for (const field of possiblePnlFields) {
+          if (position[field] !== undefined && !isNaN(parseFloat(position[field]))) {
+            pnl = parseFloat(position[field]);
+            logger.debug(`Используем поле ${field} для PNL: ${pnl}`);
+            break;
+          }
+        }
+        
+        // Расчет процента PNL
+        const margin = parseFloat(position.margin || position.marginHeld || 1);
+        pnlPercentage = pnl / margin * 100;
+        
         const newPosition = {
-          id: position.positionId,
+          id: position.positionId || position.id,
           symbol: position.symbol,
           type: position.holdSide ? position.holdSide.toUpperCase() : 'UNKNOWN',
-          entryPrice: parseFloat(position.openPrice),
-          size: parseFloat(position.total),
+          entryPrice: entryPrice,
+          size: parseFloat(position.total || position.size || 0),
           entryTime: entryTimeMs,
           leverage: parseFloat(position.leverage || 1),
           currentPrice: this.currentPrices[position.symbol] || 0,
-          pnl: parseFloat(position.unrealizedPL || 0),
-          pnlPercentage: parseFloat(position.unrealizedPL || 0) / parseFloat(position.margin || 1) * 100
+          pnl: pnl,
+          pnlPercentage: pnlPercentage
         };
         
         this.openPositions.push(newPosition);
@@ -162,7 +207,7 @@ class PositionManager extends EventEmitter {
     // Логируем все обработанные позиции
     logger.debug(`Обработано ${this.openPositions.length} открытых позиций`);
     for (const pos of this.openPositions) {
-      logger.debug(`Позиция ${pos.symbol}: время=${new Date(pos.entryTime).toISOString()}, длительность=${this.formatDuration(Date.now() - pos.entryTime)}`);
+      logger.debug(`Позиция ${pos.symbol}: вход=${pos.entryPrice}, текущая=${pos.currentPrice}, время=${new Date(pos.entryTime).toISOString()}, длительность=${this.formatDuration(Date.now() - pos.entryTime)}`);
     }
     
     return this.openPositions;
