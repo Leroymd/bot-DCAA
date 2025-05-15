@@ -802,137 +802,138 @@ class BitGetClient {
   }
 
   /**
-   * Размещение ордера с установкой TP/SL в одном запросе
-   * @param {string} symbol - Символ торговой пары
-   * @param {string} side - Сторона (buy/sell)
-   * @param {string} orderType - Тип ордера (limit/market)
-   * @param {string|number} size - Размер позиции
-   * @param {string|number|null} price - Цена (только для limit ордеров)
-   * @param {string|number|null} takeProfitPrice - Цена для Take Profit
-   * @param {string|number|null} stopLossPrice - Цена для Stop Loss
-   * @returns {Promise<Object>} - Результат размещения ордера
-   */
-  async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfitPrice = null, stopLossPrice = null) {
-    if (!symbol) {
-      const error = new Error('Для размещения ордера необходим символ');
-      return Promise.reject(error);
-    }
-
-    const normalizedSide = side.toLowerCase();
-    if (normalizedSide !== 'buy' && normalizedSide !== 'sell') {
-      logger.error(`Неверное значение стороны: ${side}`);
-      return Promise.reject(new Error(`Неверное значение стороны: ${side}`));
-    }
-
-    try {
-      // Получаем текущую цену
-      const ticker = await this.getTicker(symbol);
-      if (!ticker || !ticker.data || !ticker.data.last) {
-        return Promise.reject(new Error(`Не удалось получить текущую цену для ${symbol}`));
-      }
-      
-      const currentPrice = parseFloat(ticker.data.last);
-      
-      // Проверяем и форматируем размер позиции
-      let formattedSize;
-      let usdtValue;
-      
-      // Если размер передан как строка с USDT в конце
-      if (typeof size === 'string' && size.includes('USDT')) {
-        const usdtAmount = parseFloat(size.replace('USDT', '').trim());
-        usdtValue = usdtAmount;
-        
-        // Преобразуем сумму в USDT в количество контрактов
-        formattedSize = (usdtAmount / currentPrice).toFixed(4);
-        logger.info(`Преобразование ${usdtAmount} USDT в ${formattedSize} контрактов по цене ${currentPrice}`);
-      } 
-      // Если передан просто размер позиции (число или строка с числом)
-      else {
-        const sizeNumber = parseFloat(size);
-        
-        // Проверяем, достаточно ли размера позиции (в USDT)
-        usdtValue = sizeNumber * currentPrice;
-        formattedSize = sizeNumber.toString();
-        
-        logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
-      }
-      
-      // Проверка минимального размера (5 USDT)
-      if (usdtValue < 5) {
-        logger.error(`Размер позиции слишком мал: ${usdtValue.toFixed(2)} USDT. Минимальный размер: 5 USDT`);
-        return Promise.reject(new Error(`Размер позиции должен быть не менее 5 USDT. Текущий размер: ${usdtValue.toFixed(2)} USDT`));
-      }
-
-      // Получаем информацию о символе для форматирования цен
-      const symbolInfo = await this.getSymbolInfo(symbol);
-      
-      // Форматируем цены
-      let formattedPrice = price;
-      let formattedTpPrice = takeProfitPrice;
-      let formattedSlPrice = stopLossPrice;
-
-      if (symbolInfo) {
-        if (orderType.toLowerCase() === 'limit' && price) {
-          formattedPrice = this.formatPrice(price, symbolInfo);
-        }
-        
-        if (takeProfitPrice) {
-          formattedTpPrice = this.formatPrice(takeProfitPrice, symbolInfo);
-        }
-        
-        if (stopLossPrice) {
-          formattedSlPrice = this.formatPrice(stopLossPrice, symbolInfo);
-        }
-      }
-
-      // ИСПРАВЛЕНИЕ: Параметры ордера согласно актуальной документации Bitget
-      const params = {
-        symbol,
-        marginCoin: 'USDT',
-        size: formattedSize,
-        side: normalizedSide,
-        orderType: orderType.toLowerCase(),
-        timeInForceValue: 'normal',
-        marginMode: 'isolated',
-        productType: "USDT-FUTURES"
-      };
-
-      // Добавляем цену для лимитного ордера
-      if (orderType.toLowerCase() === 'limit' && formattedPrice) {
-        params.price = formattedPrice.toString();
-      }
-
-      // ИСПРАВЛЕНИЕ: Правильные параметры для TP/SL согласно актуальной документации
-      if (formattedTpPrice) {
-        params.tpTriggerPrice = formattedTpPrice.toString();
-        params.tpPriceType = "lastPrice";
-      }
-      
-      if (formattedSlPrice) {
-        params.slTriggerPrice = formattedSlPrice.toString();
-        params.slPriceType = "lastPrice";
-      }
-
-      if (this.debug) {
-        logger.info(`Размещение ордера с TP/SL: ${JSON.stringify(params)}`);
-      }
-      
-      const result = await this.submitOrder(params);
-      if (this.debug) {
-        logger.info(`Результат размещения ордера с TP/SL: ${JSON.stringify(result)}`);
-      }
-      return result;
-    } catch (error) {
-      logger.error(`Ошибка размещения ордера с TP/SL: ${error.message}`);
-      
-      if (error.response) {
-        logger.error('Данные ответа:', JSON.stringify(error.response.data));
-        logger.error('Статус ответа:', error.response.status);
-      }
-      
-      return Promise.reject(error);
-    }
+ * Размещение ордера с установкой TP/SL в одном запросе (one-way-mode)
+ * @param {string} symbol - Символ торговой пары
+ * @param {string} side - Сторона (buy/sell)
+ * @param {string} orderType - Тип ордера (limit/market)
+ * @param {string|number} size - Размер позиции
+ * @param {string|number|null} price - Цена (только для limit ордеров)
+ * @param {string|number|null} takeProfitPrice - Цена для Take Profit
+ * @param {string|number|null} stopLossPrice - Цена для Stop Loss
+ * @returns {Promise<Object>} - Результат размещения ордера
+ */
+async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfitPrice = null, stopLossPrice = null) {
+  if (!symbol) {
+    const error = new Error('Для размещения ордера необходим символ');
+    return Promise.reject(error);
   }
+
+  // Приводим side к нижнему регистру
+  const normalizedSide = side.toLowerCase();
+  if (normalizedSide !== 'buy' && normalizedSide !== 'sell') {
+    logger.error(`Неверное значение стороны: ${side}`);
+    return Promise.reject(new Error(`Неверное значение стороны: ${side}`));
+  }
+
+  try {
+    // Получаем текущую цену
+    const ticker = await this.getTicker(symbol);
+    if (!ticker || !ticker.data || !ticker.data.last) {
+      return Promise.reject(new Error(`Не удалось получить текущую цену для ${symbol}`));
+    }
+    
+    const currentPrice = parseFloat(ticker.data.last);
+    
+    // Проверяем и форматируем размер позиции
+    let formattedSize;
+    let usdtValue;
+    
+    // Если размер передан как строка с USDT в конце
+    if (typeof size === 'string' && size.includes('USDT')) {
+      const usdtAmount = parseFloat(size.replace('USDT', '').trim());
+      usdtValue = usdtAmount;
+      
+      // Преобразуем сумму в USDT в количество контрактов
+      formattedSize = (usdtAmount / currentPrice).toFixed(4);
+      logger.info(`Преобразование ${usdtAmount} USDT в ${formattedSize} контрактов по цене ${currentPrice}`);
+    } 
+    // Если передан просто размер позиции (число или строка с числом)
+    else {
+      const sizeNumber = parseFloat(size);
+      
+      // Проверяем, достаточно ли размера позиции (в USDT)
+      usdtValue = sizeNumber * currentPrice;
+      formattedSize = sizeNumber.toString();
+      
+      logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
+    }
+    
+    // Проверка минимального размера (5 USDT)
+    if (usdtValue < 5) {
+      logger.error(`Размер позиции слишком мал: ${usdtValue.toFixed(2)} USDT. Минимальный размер: 5 USDT`);
+      return Promise.reject(new Error(`Размер позиции должен быть не менее 5 USDT. Текущий размер: ${usdtValue.toFixed(2)} USDT`));
+    }
+
+    // Получаем информацию о символе для форматирования цен
+    const symbolInfo = await this.getSymbolInfo(symbol);
+    
+    // Форматируем цены
+    let formattedPrice = price;
+    let formattedTpPrice = takeProfitPrice;
+    let formattedSlPrice = stopLossPrice;
+
+    if (symbolInfo) {
+      if (orderType.toLowerCase() === 'limit' && price) {
+        formattedPrice = this.formatPrice(price, symbolInfo);
+      }
+      
+      if (takeProfitPrice) {
+        formattedTpPrice = this.formatPrice(takeProfitPrice, symbolInfo);
+      }
+      
+      if (stopLossPrice) {
+        formattedSlPrice = this.formatPrice(stopLossPrice, symbolInfo);
+      }
+    }
+
+    // Параметры ордера согласно актуальной документации Bitget для one-way-mode
+    const params = {
+      symbol,
+      marginCoin: 'USDT',
+      size: formattedSize,
+      side: normalizedSide,
+      orderType: orderType.toLowerCase(),
+      timeInForceValue: 'normal',
+      marginMode: 'isolated',
+      productType: "USDT-FUTURES"
+    };
+
+    // Важно: НЕ указываем tradeSide в one-way-mode
+
+    // Добавляем цену для лимитного ордера
+    if (orderType.toLowerCase() === 'limit' && formattedPrice) {
+      params.price = formattedPrice.toString();
+    }
+
+    // Правильные параметры для TP/SL согласно актуальной документации
+    if (formattedTpPrice) {
+      params.presetStopSurplusPrice = formattedTpPrice.toString();
+    }
+    
+    if (formattedSlPrice) {
+      params.presetStopLossPrice = formattedSlPrice.toString();
+    }
+
+    if (this.debug) {
+      logger.info(`Размещение ордера с TP/SL (one-way-mode): ${JSON.stringify(params)}`);
+    }
+    
+    const result = await this.submitOrder(params);
+    if (this.debug) {
+      logger.info(`Результат размещения ордера с TP/SL: ${JSON.stringify(result)}`);
+    }
+    return result;
+  } catch (error) {
+    logger.error(`Ошибка размещения ордера с TP/SL: ${error.message}`);
+    
+    if (error.response) {
+      logger.error('Данные ответа:', JSON.stringify(error.response.data));
+      logger.error('Статус ответа:', error.response.status);
+    }
+    
+    return Promise.reject(error);
+  }
+}
 
   /**
    * Закрытие позиции по рыночной цене
