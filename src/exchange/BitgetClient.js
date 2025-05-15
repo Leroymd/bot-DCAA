@@ -55,57 +55,59 @@ class BitGetClient {
       throw error;
     }
   }
-async getExchangeInfo() {
-  try {
-    logger.info('Получение информации о доступных торговых парах...');
-    
-    const response = await this.request('GET', '/api/v2/mix/market/contracts', {
-      productType: "USDT-FUTURES"
-    });
-    
-    // Обработка ответа и преобразование к нужному формату
-    if (response && response.code === '00000' && response.data) {
-      logger.info(`Успешно получена информация о ${response.data.length} торговых парах`);
+
+  async getExchangeInfo() {
+    try {
+      logger.info('Получение информации о доступных торговых парах...');
       
-      if (this.debug) {
-        // В режиме отладки выводим первые несколько пар
-        logger.debug(`Пример данных: ${JSON.stringify(response.data.slice(0, 3))}`);
+      const response = await this.request('GET', '/api/v2/mix/market/contracts', {
+        productType: "USDT-FUTURES"
+      });
+      
+      // Обработка ответа и преобразование к нужному формату
+      if (response && response.code === '00000' && response.data) {
+        logger.info(`Успешно получена информация о ${response.data.length} торговых парах`);
+        
+        if (this.debug) {
+          // В режиме отладки выводим первые несколько пар
+          logger.debug(`Пример данных: ${JSON.stringify(response.data.slice(0, 3))}`);
+        }
+        
+        return response;
+      } else {
+        logger.warn(`Ошибка при получении информации о торговых парах: ${response ? response.msg : 'пустой ответ'}`);
+        return { code: 'ERROR', msg: response ? response.msg : 'Empty response', data: [] };
+      }
+    } catch (error) {
+      logger.error(`Ошибка в getExchangeInfo: ${error.message}`);
+      return { code: 'ERROR', msg: error.message, data: [] };
+    }
+  }
+
+  // Вспомогательный метод для получения информации о конкретном символе
+  async getSymbolInfo(symbol) {
+    try {
+      const response = await this.getExchangeInfo();
+      
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        logger.warn(`Не удалось получить информацию о символе ${symbol}`);
+        return null;
       }
       
-      return response;
-    } else {
-      logger.warn(`Ошибка при получении информации о торговых парах: ${response ? response.msg : 'пустой ответ'}`);
-      return { code: 'ERROR', msg: response ? response.msg : 'Empty response', data: [] };
+      // Ищем наш символ в списке
+      const symbolInfo = response.data.find(item => item.symbol === symbol);
+      if (!symbolInfo) {
+        logger.warn(`Символ ${symbol} не найден в списке доступных`);
+        return null;
+      }
+      
+      return symbolInfo;
+    } catch (error) {
+      logger.error(`Ошибка при получении информации о символе ${symbol}: ${error.message}`);
+      return null;
     }
-  } catch (error) {
-    logger.error(`Ошибка в getExchangeInfo: ${error.message}`);
-    return { code: 'ERROR', msg: error.message, data: [] };
   }
-}
 
-// Вспомогательный метод для получения информации о конкретном символе
-async getSymbolInfo(symbol) {
-  try {
-    const response = await this.getExchangeInfo();
-    
-    if (!response || !response.data || !Array.isArray(response.data)) {
-      logger.warn(`Не удалось получить информацию о символе ${symbol}`);
-      return null;
-    }
-    
-    // Ищем наш символ в списке
-    const symbolInfo = response.data.find(item => item.symbol === symbol);
-    if (!symbolInfo) {
-      logger.warn(`Символ ${symbol} не найден в списке доступных`);
-      return null;
-    }
-    
-    return symbolInfo;
-  } catch (error) {
-    logger.error(`Ошибка при получении информации о символе ${symbol}: ${error.message}`);
-    return null;
-  }
-}
   async request(method, endpoint, params = {}, data = null, retryCount = 0) {
     try {
       const timestamp = Date.now().toString();
@@ -274,60 +276,60 @@ async getSymbolInfo(symbol) {
   }
 
   // Улучшенный метод для получения детальной информации о позиции
- async getPositionDetails(symbol) {
-  try {
-    if (!symbol) {
-      throw new Error('Символ обязателен для получения деталей позиции');
+  async getPositionDetails(symbol) {
+    try {
+      if (!symbol) {
+        throw new Error('Символ обязателен для получения деталей позиции');
+      }
+      
+      logger.info(`Получение деталей позиции для ${symbol}`);
+      
+      const params = { 
+        symbol, 
+        productType: "USDT-FUTURES",
+        marginCoin: "USDT"
+      };
+      
+      // Получаем все открытые позиции
+      const response = await this.request('GET', '/api/v2/mix/position/all-position', params);
+      
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        logger.warn(`Не удалось получить позиции для ${symbol}`);
+        return null;
+      }
+      
+      // Ищем нужную позицию среди полученных
+      const position = response.data.find(p => p.symbol === symbol);
+      
+      if (!position) {
+        logger.warn(`Позиция для ${symbol} не найдена`);
+        return null;
+      }
+      
+      // Дополнительно получаем текущую рыночную цену
+      const ticker = await this.getTicker(symbol);
+      const marketPrice = ticker && ticker.data && ticker.data.last 
+          ? parseFloat(ticker.data.last) 
+          : null;
+      
+      // Добавляем рыночную цену к информации о позиции
+      const enhancedPosition = {
+        ...position,
+        marketPrice,
+        positionValue: marketPrice ? parseFloat(position.total) * marketPrice : null
+      };
+      
+      logger.info(`Детали позиции для ${symbol} получены успешно`);
+      
+      return {
+        code: '00000',
+        data: enhancedPosition
+      };
+    } catch (error) {
+      logger.error(`Ошибка при получении деталей позиции ${symbol}: ${error.message}`);
+      throw error;
     }
-    
-    logger.info(`Получение деталей позиции для ${symbol}`);
-    
-    const params = { 
-      symbol, 
-      productType: "USDT-FUTURES",
-      marginCoin: "USDT"
-    };
-    
-    // Получаем все открытые позиции
-    const response = await this.request('GET', '/api/v2/mix/position/all-position', params);
-    
-    if (!response || !response.data || !Array.isArray(response.data)) {
-      logger.warn(`Не удалось получить позиции для ${symbol}`);
-      return null;
-    }
-    
-    // Ищем нужную позицию среди полученных
-    const position = response.data.find(p => p.symbol === symbol);
-    
-    if (!position) {
-      logger.warn(`Позиция для ${symbol} не найдена`);
-      return null;
-    }
-    
-    // Дополнительно получаем текущую рыночную цену
-    const ticker = await this.getTicker(symbol);
-    const marketPrice = ticker && ticker.data && ticker.data.last 
-        ? parseFloat(ticker.data.last) 
-        : null;
-    
-    // Добавляем рыночную цену к информации о позиции
-    const enhancedPosition = {
-      ...position,
-      marketPrice,
-      positionValue: marketPrice ? parseFloat(position.total) * marketPrice : null
-    };
-    
-    logger.info(`Детали позиции для ${symbol} получены успешно`);
-    
-    return {
-      code: '00000',
-      data: enhancedPosition
-    };
-  } catch (error) {
-    logger.error(`Ошибка при получении деталей позиции ${symbol}: ${error.message}`);
-    throw error;
   }
-}
 
   // Метод для получения деталей ордера
   async getOrderDetails(symbol, orderId) {
@@ -632,32 +634,6 @@ async getSymbolInfo(symbol) {
     }
   }
 
-  // Функция для получения информации о символе и его правилах
-  async getSymbolInfo(symbol) {
-    try {
-      const response = await this.request('GET', '/api/v2/mix/market/contracts', {
-        productType: "USDT-FUTURES"
-      });
-      
-      if (!response || !response.data || !Array.isArray(response.data)) {
-        logger.warn(`Не удалось получить информацию о символе ${symbol}`);
-        return null;
-      }
-      
-      // Ищем наш символ в списке
-      const symbolInfo = response.data.find(item => item.symbol === symbol);
-      if (!symbolInfo) {
-        logger.warn(`Символ ${symbol} не найден в списке доступных`);
-        return null;
-      }
-      
-      return symbolInfo;
-    } catch (error) {
-      logger.error(`Ошибка при получении информации о символе ${symbol}: ${error.message}`);
-      return null;
-    }
-  }
-
   // Функция для форматирования цены с учетом минимального шага
   formatPrice(price, symbol) {
     // Форматирование цены в строку с точностью, подходящей для данного символа
@@ -762,7 +738,7 @@ async getSymbolInfo(symbol) {
     }
   }
 
-  // Новый метод для размещения ордера с установкой TP/SL в одном запросе
+  // Метод для размещения ордера с установкой TP/SL в одном запросе
   async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfitPrice = null, stopLossPrice = null) {
     if (!symbol) {
       const error = new Error('Для размещения ордера необходим символ');
@@ -803,7 +779,7 @@ async getSymbolInfo(symbol) {
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal',
-		marginMode: 'isolated',
+        marginMode: 'isolated',
         productType: "USDT-FUTURES"
       };
 
@@ -854,72 +830,72 @@ async getSymbolInfo(symbol) {
   
   // Исправленный метод для установки TP/SL
   async setTpsl(symbol, holdSide, planType, triggerPrice, size) {
-  try {
-    // Проверяем и приводим holdSide к верхнему регистру
-    if (!holdSide || (holdSide.toUpperCase() !== 'LONG' && holdSide.toUpperCase() !== 'SHORT')) {
-      logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'LONG' или 'SHORT'`);
-      return { code: 'ERROR', msg: 'Invalid holdSide parameter' };
-    }
-    
-    // Приводим holdSide к верхнему регистру для API
-    const formattedHoldSide = holdSide.toUpperCase();
-    
-    // Получаем информацию о символе для правильного форматирования цены
-    const symbolInfo = await this.getSymbolInfo(symbol);
-    let formattedTriggerPrice = triggerPrice;
-    
-    if (symbolInfo) {
-      formattedTriggerPrice = this.formatPrice(triggerPrice, symbolInfo);
-      logger.info(`Отформатированная цена триггера для ${symbol}: ${formattedTriggerPrice} (исходная: ${triggerPrice})`);
-    }
-    
-    // Проверяем planType
-    if (planType !== 'profit_plan' && planType !== 'loss_plan') {
-      logger.warn(`Неверное значение planType: ${planType}. Должно быть 'profit_plan' или 'loss_plan'`);
-      planType = planType === 'tp' ? 'profit_plan' : 'loss_plan';
-    }
-    
-    // Формируем параметры запроса согласно документации Bitget
-    const requestBody = {
-      symbol,
-      marginCoin: 'USDT',
-      planType,
-      triggerPrice: formattedTriggerPrice.toString(),
-      triggerPriceType: "mark_price",
-      size: size.toString(),
-      holdSide: formattedHoldSide, // ВАЖНО: в верхнем регистре
-      productType: "USDT-FUTURES"
-    };
-    
-    if (this.debug) {
-      logger.info(`Установка TP/SL: ${JSON.stringify(requestBody)}`);
-    }
-    
-    // Выполняем запрос
     try {
-      const response = await this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, requestBody);
-      
-      if (response && response.code === '00000') {
-        logger.info(`Успешно установлен ${planType === 'profit_plan' ? 'Take Profit' : 'Stop Loss'} для ${symbol}`);
-        return response;
-      } else {
-        logger.warn(`Ошибка при установке ${planType}: ${response ? response.msg : 'Нет ответа от API'}`);
-        return response;
-      }
-    } catch (apiError) {
-      logger.error(`Ошибка при установке ${planType === 'profit_plan' ? 'Take Profit' : 'Stop Loss'}: ${apiError.message}`);
-      
-      if (apiError.response && apiError.response.data) {
-        logger.error(`Ответ от API: ${JSON.stringify(apiError.response.data)}`);
+      // Проверяем и приводим holdSide к верхнему регистру
+      if (!holdSide || (holdSide.toUpperCase() !== 'LONG' && holdSide.toUpperCase() !== 'SHORT')) {
+        logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'LONG' или 'SHORT'`);
+        return { code: 'ERROR', msg: 'Invalid holdSide parameter' };
       }
       
-      throw apiError;
+      // Приводим holdSide к верхнему регистру для API
+      const formattedHoldSide = holdSide.toUpperCase();
+      
+      // Получаем информацию о символе для правильного форматирования цены
+      const symbolInfo = await this.getSymbolInfo(symbol);
+      let formattedTriggerPrice = triggerPrice;
+      
+      if (symbolInfo) {
+        formattedTriggerPrice = this.formatPrice(triggerPrice, symbolInfo);
+        logger.info(`Отформатированная цена триггера для ${symbol}: ${formattedTriggerPrice} (исходная: ${triggerPrice})`);
+      }
+      
+      // Проверяем planType
+      if (planType !== 'profit_plan' && planType !== 'loss_plan') {
+        logger.warn(`Неверное значение planType: ${planType}. Должно быть 'profit_plan' или 'loss_plan'`);
+        planType = planType === 'tp' ? 'profit_plan' : 'loss_plan';
+      }
+      
+      // Формируем параметры запроса согласно документации Bitget
+      const requestBody = {
+        symbol,
+        marginCoin: 'USDT',
+        planType,
+        triggerPrice: formattedTriggerPrice.toString(),
+        triggerPriceType: "mark_price",
+        size: size.toString(),
+        holdSide: formattedHoldSide, // ВАЖНО: в верхнем регистре
+        productType: "USDT-FUTURES"
+      };
+      
+      if (this.debug) {
+        logger.info(`Установка TP/SL: ${JSON.stringify(requestBody)}`);
+      }
+      
+      // Выполняем запрос
+      try {
+        const response = await this.request('POST', '/api/v2/mix/order/place-tpsl-order', {}, requestBody);
+        
+        if (response && response.code === '00000') {
+          logger.info(`Успешно установлен ${planType === 'profit_plan' ? 'Take Profit' : 'Stop Loss'} для ${symbol}`);
+          return response;
+        } else {
+          logger.warn(`Ошибка при установке ${planType}: ${response ? response.msg : 'Нет ответа от API'}`);
+          return response;
+        }
+      } catch (apiError) {
+        logger.error(`Ошибка при установке ${planType === 'profit_plan' ? 'Take Profit' : 'Stop Loss'}: ${apiError.message}`);
+        
+        if (apiError.response && apiError.response.data) {
+          logger.error(`Ответ от API: ${JSON.stringify(apiError.response.data)}`);
+        }
+        
+        throw apiError;
+      }
+    } catch (error) {
+      logger.error(`Ошибка при установке TP/SL: ${error.message}`);
+      return { code: 'ERROR', msg: error.message };
     }
-  } catch (error) {
-    logger.error(`Ошибка при установке TP/SL: ${error.message}`);
-    return { code: 'ERROR', msg: error.message };
   }
-}
 
   // Метод для модификации существующего TP/SL
   async modifyTpsl(symbol, holdSide, planType, triggerPrice) {
@@ -944,67 +920,68 @@ async getSymbolInfo(symbol) {
   
   // Исправленный метод для установки трейлинг-стопа
   async setTrailingStop(symbol, holdSide, callbackRatio, size) {
-  try {
-    if (!symbol || !callbackRatio) {
-      logger.error('Для установки трейлинг-стопа необходимы символ и callbackRatio');
-      return { code: 'ERROR', msg: 'Missing required parameters' };
-    }
-    
-    // Приводим holdSide к верхнему регистру и проверяем корректность
-    const formattedHoldSide = holdSide.toUpperCase();
-    if (formattedHoldSide !== 'LONG' && formattedHoldSide !== 'SHORT') {
-      logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'LONG' или 'SHORT'`);
-      return { code: 'ERROR', msg: 'Invalid holdSide parameter' };
-    }
-    
-    // Корректно определяем side на основе holdSide для закрытия позиции
-    // Для LONG позиции нужен SELL ордер, для SHORT - BUY ордер
-    const side = formattedHoldSide === "LONG" ? "sell" : "buy";
-    
-    // Корректно определяем tradeSide
-    const tradeSide = formattedHoldSide === "LONG" ? "close_long" : "close_short";
-    
-    // Устанавливаем параметры для трейлинг-стопа согласно документации
-    const params = {
-      symbol,
-      marginCoin: 'USDT',
-      planType: "trailing_stop_plan",
-      callbackRatio: callbackRatio.toString(),
-      size: size.toString(),
-      side, // Правильное значение side (sell/buy)
-      triggerType: "mark_price",
-      holdSide: formattedHoldSide, // В верхнем регистре
-      timeInForceValue: "normal",
-      tradeSide, // Правильное значение tradeSide
-      productType: "USDT-FUTURES"
-    };
-    
-    if (this.debug) {
-      logger.info(`Установка трейлинг-стопа для ${symbol}: ${JSON.stringify(params)}`);
-    }
-    
     try {
-      const response = await this.request('POST', '/api/v2/mix/order/place-plan-order', {}, params);
-      
-      if (response && response.code === '00000') {
-        logger.info(`Трейлинг-стоп успешно установлен для ${symbol} с отступом ${callbackRatio}%`);
-        return response;
-      } else {
-        logger.warn(`Ошибка при установке трейлинг-стопа: ${response ? response.msg : 'Нет ответа от API'}`);
-        return response;
-      }
-    } catch (apiError) {
-      logger.error(`Ошибка при установке трейлинг-стопа: ${apiError.message}`);
-      
-      if (apiError.response && apiError.response.data) {
-        logger.error(`Ответ от API: ${JSON.stringify(apiError.response.data)}`);
+      if (!symbol || !callbackRatio) {
+        logger.error('Для установки трейлинг-стопа необходимы символ и callbackRatio');
+        return { code: 'ERROR', msg: 'Missing required parameters' };
       }
       
-      throw apiError;
+      // Приводим holdSide к верхнему регистру и проверяем корректность
+      const formattedHoldSide = holdSide.toUpperCase();
+      if (formattedHoldSide !== 'LONG' && formattedHoldSide !== 'SHORT') {
+        logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'LONG' или 'SHORT'`);
+        return { code: 'ERROR', msg: 'Invalid holdSide parameter' };
+      }
+      
+      // Корректно определяем side на основе holdSide для закрытия позиции
+      // Для LONG позиции нужен SELL ордер, для SHORT - BUY ордер
+      const side = formattedHoldSide === "LONG" ? "sell" : "buy";
+      
+      // Корректно определяем tradeSide
+      const tradeSide = formattedHoldSide === "LONG" ? "close_long" : "close_short";
+      
+      // Устанавливаем параметры для трейлинг-стопа согласно документации
+      const params = {
+        symbol,
+        marginCoin: 'USDT',
+        planType: "trailing_stop_plan",
+        callbackRatio: callbackRatio.toString(),
+        size: size.toString(),
+        side, // Правильное значение side (sell/buy)
+        triggerType: "mark_price",
+        holdSide: formattedHoldSide, // В верхнем регистре
+        timeInForceValue: "normal",
+        tradeSide, // Правильное значение tradeSide
+        productType: "USDT-FUTURES"
+      };
+      
+      if (this.debug) {
+        logger.info(`Установка трейлинг-стопа для ${symbol}: ${JSON.stringify(params)}`);
+      }
+      
+      try {
+        const response = await this.request('POST', '/api/v2/mix/order/place-plan-order', {}, params);
+        
+        if (response && response.code === '00000') {
+          logger.info(`Трейлинг-стоп успешно установлен для ${symbol} с отступом ${callbackRatio}%`);
+          return response;
+        } else {
+          logger.warn(`Ошибка при установке трейлинг-стопа: ${response ? response.msg : 'Нет ответа от API'}`);
+          return response;
+        }
+      } catch (apiError) {
+        logger.error(`Ошибка при установке трейлинг-стопа: ${apiError.message}`);
+        
+        if (apiError.response && apiError.response.data) {
+          logger.error(`Ответ от API: ${JSON.stringify(apiError.response.data)}`);
+        }
+        
+        throw apiError;
+      }
+    } catch (error) {
+      logger.error(`Ошибка при установке трейлинг-стопа: ${error.message}`);
+      return { code: 'ERROR', msg: error.message };
     }
-  } catch (error) {
-    logger.error(`Ошибка при установке трейлинг-стопа: ${error.message}`);
-    return { code: 'ERROR', msg: error.message };
   }
 }
 
