@@ -1,6 +1,7 @@
 // client/src/types/index.ts - обновленная версия с новыми типами
 // client/src/types/index.ts - обновленная версия
 export interface BotStatus {
+  status: string; // Добавляем это свойство
   isActive: boolean;
   balance: number;
   totalProfit: number;
@@ -11,7 +12,9 @@ export interface BotStatus {
   totalTrades: number;
   avgProfit: number;
   withdrawn: number;
-  lastScan: string | null;
+  lastScan: string | null; // Убедимся, что тип правильный
+  uptime: number; // Добавляем это свойство
+  startTime: number; // Добавляем это свойство
 }
 
 export interface TradingPair {

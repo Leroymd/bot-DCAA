@@ -4,7 +4,13 @@
   "passphrase": "Workinday13",
   "demo": false,
   "strategy": "fractal",
-  "tradingPairs": [],
+  "tradingPairs": [
+    "XRPUSDT",
+    "XLMUSDT",
+    "FILUSDT",
+    "ICPUSDT",
+    "SOLUSDT"
+  ],
   "maxTradingPairs": 5,
   "pacLength": 34,
   "fastEMAlength": 89,

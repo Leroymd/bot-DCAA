@@ -24,7 +24,7 @@ const defaultBotStatus: BotStatus = {
   totalTrades: 0,
   avgProfit: 0,
   withdrawn: 0,
-  lastScan: undefined,
+  lastScan: null, // Меняем undefined на null
   uptime: 0,
   startTime: 0
 };

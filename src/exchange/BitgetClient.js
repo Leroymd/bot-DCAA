@@ -347,6 +347,44 @@ class BitGetClient {
     }
   }
 
+  // ДОБАВЛЕН МЕТОД: Получение исторических свечей
+  async getCandles(symbol, granularity, limit = 100) {
+    try {
+      if (!symbol || !granularity) {
+        logger.error('Не указаны обязательные параметры (symbol, granularity) для получения свечей');
+        throw new Error('Missing required parameters for getCandles');
+      }
+      
+      logger.info(`Запрос свечей для ${symbol}, интервал: ${granularity}, количество: ${limit}`);
+      
+      const params = {
+        symbol,
+        granularity,
+        limit: limit.toString(),
+        productType: "USDT-FUTURES"
+      };
+      
+      const response = await this.request('GET', '/api/v2/mix/market/candles', params);
+      
+      if (!response || !response.data) {
+        logger.warn(`Не удалось получить данные свечей для ${symbol}`);
+        return { code: 'ERROR', msg: 'Failed to get candles data', data: [] };
+      }
+      
+      if (this.debug) {
+        logger.info(`Получено ${response.data.length} свечей для ${symbol}`);
+        if (response.data.length > 0) {
+          logger.info(`Первая свеча: ${JSON.stringify(response.data[0])}`);
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      logger.error(`Ошибка при получении свечей для ${symbol}: ${error.message}`);
+      return { code: 'ERROR', msg: error.message, data: [] };
+    }
+  }
+
   async setLeverage(symbol, marginMode, leverage) {
     return this.request('POST', '/api/v2/mix/account/set-leverage', {}, {
       symbol,
