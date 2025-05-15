@@ -1,8 +1,10 @@
-// client/src/components/Layout.tsx - обновленная версия
+// client/src/components/Layout.tsx - обновленная версия с информацией о балансе
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { ChevronDown, Settings, Activity, BarChart3, Home, Box, AlertOctagon, XOctagon, CheckCircle } from 'lucide-react';
 import { BotStatus } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import { BalanceInfo } from './BalanceInfo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,6 +13,8 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
   const [showMenu, setShowMenu] = React.useState(false);
+  // Получаем информацию о балансе из контекста приложения
+  const { balanceInfo } = useAppContext();
   
   const toggleMenu = () => {
     setShowMenu(!showMenu);
@@ -26,24 +30,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
               FractalScalp Bot
             </div>
             
-            {/* Статус бота */}
-            {botStatus && (
-              <div className="ml-6 hidden md:flex items-center">
-                <div className={`flex items-center mr-8 ${botStatus.isActive ? 'text-green-400' : 'text-red-400'}`}>
-                  <div className={`w-3 h-3 rounded-full mr-2 ${botStatus.isActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-                  <span className="text-sm">{botStatus.isActive ? 'Работает' : 'Остановлен'}</span>
-                </div>
-                
-                <div className="flex items-center mr-8">
-                  <Activity className="w-4 h-4 mr-2 text-blue-400" />
-                  <span className="text-sm">{botStatus.profitPercentage >= 0 ? '+' : ''}{botStatus.profitPercentage?.toFixed(2) || '0.00'}%</span>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="text-sm">{botStatus.balance?.toFixed(2) || '0.00'} USDT</div>
-                </div>
+            {/* Статус бота и баланс */}
+            <div className="ml-6 hidden md:flex items-center space-x-8">
+              <div className={`flex items-center ${botStatus?.isActive ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`w-3 h-3 rounded-full mr-2 ${botStatus?.isActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                <span className="text-sm">{botStatus?.isActive ? 'Работает' : 'Остановлен'}</span>
               </div>
-            )}
+              
+              {/* Компактная информация о балансе */}
+              <BalanceInfo balanceInfo={balanceInfo} compact={true} />
+            </div>
           </div>
           
           {/* Мобильная навигация */}
@@ -87,13 +83,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
             </li>
             <li>
               <NavLink
-                to="/performance"
+                to="/signals"
                 className={({ isActive }) => 
                   `flex items-center px-4 py-2 rounded-md ${isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-700 text-gray-300'}`
                 }
               >
                 <BarChart3 className="w-5 h-5 mr-3" />
-                <span>Производительность</span>
+                <span>Сигналы</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/stats"
+                className={({ isActive }) => 
+                  `flex items-center px-4 py-2 rounded-md ${isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-700 text-gray-300'}`
+                }
+              >
+                <BarChart3 className="w-5 h-5 mr-3" />
+                <span>Статистика</span>
               </NavLink>
             </li>
             <li>
@@ -107,40 +114,29 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
                 <span>Настройки</span>
               </NavLink>
             </li>
-            <li>
-              <NavLink
-                to="/logs"
-                className={({ isActive }) => 
-                  `flex items-center px-4 py-2 rounded-md ${isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-700 text-gray-300'}`
-                }
-              >
-                <Box className="w-5 h-5 mr-3" />
-                <span>Логи</span>
-              </NavLink>
-            </li>
           </ul>
           
-          {/* Статус бота в сайдбаре */}
-          {botStatus && (
-            <div className="absolute bottom-8 left-4 right-4 bg-gray-700 p-4 rounded-lg">
+          {/* Детальная информация о балансе и статус бота в сайдбаре */}
+          <div className="absolute bottom-8 left-4 right-4 space-y-4">
+            {/* Полная информация о балансе */}
+            <BalanceInfo balanceInfo={balanceInfo} />
+            
+            {/* Информация о статусе бота */}
+            <div className="bg-gray-700 p-4 rounded-lg">
               <h3 className="text-xs uppercase text-gray-300 mb-2">Статус бота</h3>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm">Состояние:</span>
-                <div className={`flex items-center ${botStatus.isActive ? 'text-green-400' : 'text-red-400'}`}>
-                  {botStatus.isActive ? (
+                <div className={`flex items-center ${botStatus?.isActive ? 'text-green-400' : 'text-red-400'}`}>
+                  {botStatus?.isActive ? (
                     <CheckCircle className="w-4 h-4 mr-1" />
                   ) : (
                     <XOctagon className="w-4 h-4 mr-1" />
                   )}
-                  <span className="text-sm">{botStatus.isActive ? 'Активен' : 'Остановлен'}</span>
+                  <span className="text-sm">{botStatus?.isActive ? 'Активен' : 'Остановлен'}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Баланс:</span>
-                <span className="text-sm">{botStatus.balance?.toFixed(2) || '0.00'} USDT</span>
-              </div>
             </div>
-          )}
+          </div>
         </nav>
         
         {/* Мобильная навигация */}
@@ -181,14 +177,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
                 </li>
                 <li>
                   <NavLink
-                    to="/performance"
+                    to="/signals"
                     className={({ isActive }) => 
                       `flex items-center px-4 py-2 rounded-md ${isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-700 text-gray-300'}`
                     }
                     onClick={toggleMenu}
                   >
                     <BarChart3 className="w-5 h-5 mr-3" />
-                    <span>Производительность</span>
+                    <span>Сигналы</span>
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/stats"
+                    className={({ isActive }) => 
+                      `flex items-center px-4 py-2 rounded-md ${isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-700 text-gray-300'}`
+                    }
+                    onClick={toggleMenu}
+                  >
+                    <BarChart3 className="w-5 h-5 mr-3" />
+                    <span>Статистика</span>
                   </NavLink>
                 </li>
                 <li>
@@ -203,41 +211,49 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
                     <span>Настройки</span>
                   </NavLink>
                 </li>
-                <li>
-                  <NavLink
-                    to="/logs"
-                    className={({ isActive }) => 
-                      `flex items-center px-4 py-2 rounded-md ${isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-700 text-gray-300'}`
-                    }
-                    onClick={toggleMenu}
-                  >
-                    <Box className="w-5 h-5 mr-3" />
-                    <span>Логи</span>
-                  </NavLink>
-                </li>
               </ul>
               
-              {/* Мобильный статус бота */}
-              {botStatus && (
-                <div className="mt-8 bg-gray-700 p-4 rounded-lg">
+              {/* Мобильный статус бота и баланс */}
+              <div className="mt-8 space-y-4">
+                {/* Компактная информация о балансе */}
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <h3 className="text-xs uppercase text-gray-300 mb-2">Баланс</h3>
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">USDT:</span>
+                      <span className="font-medium">{balanceInfo.usdtBalance.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">PnL:</span>
+                      <span className={`${balanceInfo.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {balanceInfo.unrealizedPnl >= 0 ? '+' : ''}{balanceInfo.unrealizedPnl.toFixed(4)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">ROI:</span>
+                      <span className={`${balanceInfo.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {balanceInfo.roi >= 0 ? '+' : ''}{balanceInfo.roi.toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Статус бота */}
+                <div className="bg-gray-700 p-4 rounded-lg">
                   <h3 className="text-xs uppercase text-gray-300 mb-2">Статус бота</h3>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm">Состояние:</span>
-                    <div className={`flex items-center ${botStatus.isActive ? 'text-green-400' : 'text-red-400'}`}>
-                      {botStatus.isActive ? (
+                    <div className={`flex items-center ${botStatus?.isActive ? 'text-green-400' : 'text-red-400'}`}>
+                      {botStatus?.isActive ? (
                         <CheckCircle className="w-4 h-4 mr-1" />
                       ) : (
                         <XOctagon className="w-4 h-4 mr-1" />
                       )}
-                      <span className="text-sm">{botStatus.isActive ? 'Активен' : 'Остановлен'}</span>
+                      <span className="text-sm">{botStatus?.isActive ? 'Активен' : 'Остановлен'}</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Баланс:</span>
-                    <span className="text-sm">{botStatus.balance?.toFixed(2) || '0.00'} USDT</span>
-                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}

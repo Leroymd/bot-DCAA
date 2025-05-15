@@ -1,7 +1,6 @@
 // client/src/types/index.ts - обновленная версия с новыми типами
-// client/src/types/index.ts - обновленная версия
 export interface BotStatus {
-  status: string; // Добавляем это свойство
+  status: string;
   isActive: boolean;
   balance: number;
   totalProfit: number;
@@ -12,9 +11,29 @@ export interface BotStatus {
   totalTrades: number;
   avgProfit: number;
   withdrawn: number;
-  lastScan: string | null; // Убедимся, что тип правильный
-  uptime: number; // Добавляем это свойство
-  startTime: number; // Добавляем это свойство
+  lastScan: string | null;
+  uptime: number;
+  startTime: number;
+}
+
+// Тип для данных истории баланса
+export interface BalanceHistoryItem {
+  date: string;
+  balance: number;
+  profit: number;
+  profitPercentage: number;
+}
+
+// Новый интерфейс для подробной информации о балансе
+export interface BalanceInfo {
+  usdtBalance: number;
+  walletBalance: number;
+  available: number;
+  unrealizedPnl: number;
+  roi: number;
+  marginBalance?: number;
+  initialMargin?: number;
+  maintMargin?: number;
 }
 
 export interface TradingPair {
@@ -99,7 +118,13 @@ export interface TpSlFormData {
 export interface TrailingStopFormData {
   callbackRatio: string;
 }
-
+export interface LogEntry {
+  id: string;         // уникальный идентификатор лога
+  timestamp: string;  // временная метка
+  level: string;      // уровень лога (info, error, warn, debug)
+  message: string;    // текст сообщения
+  raw: string;        // исходная строка лога
+}
 export interface PositionDetails {
   positionId: string;
   symbol: string;

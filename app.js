@@ -14,6 +14,7 @@ const signalRoutes = require('./src/api/routes/signalRoutes');
 const performanceRoutes = require('./src/api/routes/performanceRoutes');
 const settingsRoutes = require('./src/api/routes/settingsRoutes');
 const positionRoutes = require('./src/api/routes/positionRoutes');
+const accountRoutes = require('./src/api/routes/accountRoutes');
 
 // Настройка бота
 const botSetup = require('./src/bot/setup');
@@ -44,6 +45,7 @@ app.use('/api/signals', signalRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/position', positionRoutes); // Важный маршрут для работы с позициями
+app.use('/api/account', accountRoutes);
 
 // Обработка всех остальных запросов
 app.get('*', (req, res) => {

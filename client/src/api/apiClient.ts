@@ -1,4 +1,4 @@
-// client/src/api/apiClient.ts - обновленная версия с добавленными методами
+// client/src/api/apiClient.ts - обновленная версия с новыми методами
 import axios from 'axios';
 import { 
   BotStatus, 
@@ -8,7 +8,9 @@ import {
   PnlData, 
   BotSettings, 
   Trade,
-  OrderFormData
+  OrderFormData,
+  BalanceInfo,
+  BalanceHistoryItem
 } from '../types';
 
 // Создаем экземпляр axios с базовыми настройками
@@ -51,15 +53,26 @@ export const api = {
       const response = await apiClient.post<ApiResponse>('/bot/stop');
       return response.data;
     },
-    // Новый метод для получения логов
-    getLogs: async (limit: number = 100): Promise<any[]> => {
-      try {
-        const response = await apiClient.get<DataResponse<any[]>>(`/bot/logs?limit=${limit}`);
-        return response.data.data || [];
-      } catch (error) {
-        console.error('Error getting logs:', error);
-        return [];
-      }
+    // Добавлен метод для получения логов
+    getLogs: async (limit: number = 100): Promise<string[]> => {
+      const response = await apiClient.get<DataResponse<string[]>>(`/bot/logs?limit=${limit}`);
+      return response.data.data;
+    }
+	
+  },
+  
+  // НОВЫЙ раздел: Функции для работы с аккаунтом (независимо от бота)
+  account: {
+    // Получение полной информации о балансе (независимо от состояния бота)
+    getBalanceInfo: async (): Promise<BalanceInfo> => {
+      const response = await apiClient.get<DataResponse<BalanceInfo>>('/account/balance');
+      return response.data.data;
+    },
+    
+    // Получение обобщенной статистики (независимо от состояния бота)
+    getStats: async (): Promise<any> => {
+      const response = await apiClient.get<DataResponse<any>>('/account/stats');
+      return response.data.data;
     }
   },
   
@@ -114,15 +127,10 @@ export const api = {
       const response = await apiClient.get<DataResponse<any>>('/performance/data');
       return response.data.data;
     },
-    // Новый метод для получения истории баланса
-    getBalanceHistory: async (): Promise<any[]> => {
-      try {
-        const response = await apiClient.get<any[]>('/performance/balance');
-        return response.data;
-      } catch (error) {
-        console.error('Error getting balance history:', error);
-        return [];
-      }
+    // Добавлен метод для получения истории баланса
+    getBalanceHistory: async (): Promise<BalanceHistoryItem[]> => {
+      const response = await apiClient.get<BalanceHistoryItem[]>('/performance/balance');
+      return response.data;
     }
   },
   
