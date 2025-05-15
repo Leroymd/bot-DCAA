@@ -1,4 +1,4 @@
-// src/exchange/BitgetClient.js - оптимизированная версия
+// src/exchange/BitgetClient.js - исправленная версия
 const axios = require('axios');
 const crypto = require('crypto');
 const querystring = require('querystring');
@@ -145,6 +145,12 @@ class BitGetClient {
               break;
             case '40003':
               logger.error('Ошибка passphrase. Проверьте правильность passphrase');
+              break;
+            case '45110':
+              logger.error('Ошибка: размер ордера меньше минимального (5 USDT)');
+              break;
+            case '43011':
+              logger.error(`Ошибка в параметре holdSide: ${error.response.data.msg}`);
               break;
             default:
               logger.error(`Код ошибки API: ${error.response.data.code}, сообщение: ${error.response.data.msg}`);
@@ -518,6 +524,44 @@ class BitGetClient {
     }
 
     try {
+      // Получаем текущую цену
+      const ticker = await this.getTicker(symbol);
+      if (!ticker || !ticker.data || !ticker.data.last) {
+        return Promise.reject(new Error(`Не удалось получить текущую цену для ${symbol}`));
+      }
+      
+      const currentPrice = parseFloat(ticker.data.last);
+      
+      // Проверяем и форматируем размер позиции
+      let formattedSize;
+      let usdtValue;
+      
+      // Если размер передан как строка с USDT в конце
+      if (typeof size === 'string' && size.includes('USDT')) {
+        const usdtAmount = parseFloat(size.replace('USDT', '').trim());
+        usdtValue = usdtAmount;
+        
+        // Преобразуем сумму в USDT в количество контрактов
+        formattedSize = (usdtAmount / currentPrice).toFixed(4);
+        logger.info(`Преобразование ${usdtAmount} USDT в ${formattedSize} контрактов по цене ${currentPrice}`);
+      } 
+      // Если передан просто размер позиции (число или строка с числом)
+      else {
+        const sizeNumber = parseFloat(size);
+        
+        // Проверяем, достаточно ли размера позиции (в USDT)
+        usdtValue = sizeNumber * currentPrice;
+        formattedSize = sizeNumber.toString();
+        
+        logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
+      }
+      
+      // Проверка минимального размера (5 USDT)
+      if (usdtValue < 5) {
+        logger.error(`Размер позиции слишком мал: ${usdtValue.toFixed(2)} USDT. Минимальный размер: 5 USDT`);
+        return Promise.reject(new Error(`Размер позиции должен быть не менее 5 USDT. Текущий размер: ${usdtValue.toFixed(2)} USDT`));
+      }
+
       // Определяем правильное значение tradeSide согласно документации
       let formattedTradeSide;
       if (tradeSide === "open") {
@@ -540,7 +584,7 @@ class BitGetClient {
       const params = {
         symbol,
         marginCoin: 'USDT',
-        size: size.toString(),
+        size: formattedSize,
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal', // Обязательный параметр согласно документации
@@ -607,12 +651,52 @@ class BitGetClient {
     }
 
     try {
-      // Для лимитных ордеров получаем информацию о символе для правильного форматирования цены
+      // Получаем текущую цену
+      const ticker = await this.getTicker(symbol);
+      if (!ticker || !ticker.data || !ticker.data.last) {
+        return Promise.reject(new Error(`Не удалось получить текущую цену для ${symbol}`));
+      }
+      
+      const currentPrice = parseFloat(ticker.data.last);
+      
+      // Проверяем и форматируем размер позиции
+      let formattedSize;
+      let usdtValue;
+      
+      // Если размер передан как строка с USDT в конце
+      if (typeof size === 'string' && size.includes('USDT')) {
+        const usdtAmount = parseFloat(size.replace('USDT', '').trim());
+        usdtValue = usdtAmount;
+        
+        // Преобразуем сумму в USDT в количество контрактов
+        formattedSize = (usdtAmount / currentPrice).toFixed(4);
+        logger.info(`Преобразование ${usdtAmount} USDT в ${formattedSize} контрактов по цене ${currentPrice}`);
+      } 
+      // Если передан просто размер позиции (число или строка с числом)
+      else {
+        const sizeNumber = parseFloat(size);
+        
+        // Проверяем, достаточно ли размера позиции (в USDT)
+        usdtValue = sizeNumber * currentPrice;
+        formattedSize = sizeNumber.toString();
+        
+        logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
+      }
+      
+      // Проверка минимального размера (5 USDT)
+      if (usdtValue < 5) {
+        logger.error(`Размер позиции слишком мал: ${usdtValue.toFixed(2)} USDT. Минимальный размер: 5 USDT`);
+        return Promise.reject(new Error(`Размер позиции должен быть не менее 5 USDT. Текущий размер: ${usdtValue.toFixed(2)} USDT`));
+      }
+
+      // Получаем информацию о символе для форматирования цен
+      const symbolInfo = await this.getSymbolInfo(symbol);
+      
+      // Форматируем цены
       let formattedPrice = price;
       let formattedTpPrice = takeProfitPrice;
       let formattedSlPrice = stopLossPrice;
 
-      const symbolInfo = await this.getSymbolInfo(symbol);
       if (symbolInfo) {
         if (orderType.toLowerCase() === 'limit' && price) {
           formattedPrice = this.formatPrice(price, symbolInfo);
@@ -630,7 +714,7 @@ class BitGetClient {
       const params = {
         symbol,
         marginCoin: 'USDT',
-        size: size.toString(),
+        size: formattedSize,
         side: normalizedSide,
         orderType: orderType.toLowerCase(),
         timeInForceValue: 'normal',
@@ -839,14 +923,15 @@ class BitGetClient {
    */
   async setTpsl(symbol, holdSide, planType, triggerPrice, size) {
     try {
-      // Проверяем и приводим holdSide к верхнему регистру
-      if (!holdSide || (holdSide.toUpperCase() !== 'LONG' && holdSide.toUpperCase() !== 'SHORT')) {
-        logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'LONG' или 'SHORT'`);
+      // КРИТИЧЕСКАЯ ОШИБКА: holdSide должен быть в нижнем регистре для API Bitget
+      // Приводим holdSide к нижнему регистру (long/short)
+      if (!holdSide || (holdSide.toLowerCase() !== 'long' && holdSide.toLowerCase() !== 'short')) {
+        logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'long' или 'short'`);
         return { code: 'ERROR', msg: 'Invalid holdSide parameter' };
       }
       
-      // Приводим holdSide к верхнему регистру для API
-      const formattedHoldSide = holdSide.toUpperCase();
+      // Приводим holdSide к нижнему регистру для API
+      const formattedHoldSide = holdSide.toLowerCase();
       
       // Получаем информацию о символе для правильного форматирования цены
       const symbolInfo = await this.getSymbolInfo(symbol);
@@ -871,7 +956,7 @@ class BitGetClient {
         triggerPrice: formattedTriggerPrice.toString(),
         triggerPriceType: "mark_price",
         size: size.toString(),
-        holdSide: formattedHoldSide, // ВАЖНО: в верхнем регистре
+        holdSide: formattedHoldSide, // ВАЖНО: в нижнем регистре
         productType: "USDT-FUTURES"
       };
       
@@ -920,19 +1005,19 @@ class BitGetClient {
         return { code: 'ERROR', msg: 'Missing required parameters' };
       }
       
-      // Приводим holdSide к верхнему регистру и проверяем корректность
-      const formattedHoldSide = holdSide.toUpperCase();
-      if (formattedHoldSide !== 'LONG' && formattedHoldSide !== 'SHORT') {
-        logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'LONG' или 'SHORT'`);
+      // Приводим holdSide к нижнему регистру и проверяем корректность
+      const formattedHoldSide = holdSide.toLowerCase();
+      if (formattedHoldSide !== 'long' && formattedHoldSide !== 'short') {
+        logger.warn(`Неверное значение holdSide: ${holdSide}. Должно быть 'long' или 'short'`);
         return { code: 'ERROR', msg: 'Invalid holdSide parameter' };
       }
       
       // Корректно определяем side на основе holdSide для закрытия позиции
       // Для LONG позиции нужен SELL ордер, для SHORT - BUY ордер
-      const side = formattedHoldSide === "LONG" ? "sell" : "buy";
+      const side = formattedHoldSide === "long" ? "sell" : "buy";
       
       // Корректно определяем tradeSide
-      const tradeSide = formattedHoldSide === "LONG" ? "close_long" : "close_short";
+      const tradeSide = formattedHoldSide === "long" ? "close_long" : "close_short";
       
       // Устанавливаем параметры для трейлинг-стопа согласно документации
       const params = {
@@ -943,7 +1028,7 @@ class BitGetClient {
         size: size.toString(),
         side, // Правильное значение side (sell/buy)
         triggerType: "mark_price",
-        holdSide: formattedHoldSide, // В верхнем регистре
+        holdSide: formattedHoldSide, // В нижнем регистре
         timeInForceValue: "normal",
         tradeSide, // Правильное значение tradeSide
         productType: "USDT-FUTURES"

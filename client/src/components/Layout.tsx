@@ -1,10 +1,9 @@
-// client/src/components/Layout.tsx - обновленная версия с информацией о балансе
+// client/src/components/Layout.tsx - обновленная версия с компактной информацией о балансе в шапке
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { ChevronDown, Settings, Activity, BarChart3, Home, Box, AlertOctagon, XOctagon, CheckCircle } from 'lucide-react';
 import { BotStatus } from '../types';
 import { useAppContext } from '../contexts/AppContext';
-import { BalanceInfo } from './BalanceInfo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,7 +21,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
   
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      {/* Верхняя навигационная панель */}
+      {/* Верхняя навигационная панель со статусом бота и балансом в строку */}
       <header className="bg-gray-800 border-b border-gray-700 py-3 px-4 lg:py-4">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
@@ -30,15 +29,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
               FractalScalp Bot
             </div>
             
-            {/* Статус бота и баланс */}
+            {/* Статус бота и баланс в одну строку */}
             <div className="ml-6 hidden md:flex items-center space-x-8">
               <div className={`flex items-center ${botStatus?.isActive ? 'text-green-400' : 'text-red-400'}`}>
                 <div className={`w-3 h-3 rounded-full mr-2 ${botStatus?.isActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
                 <span className="text-sm">{botStatus?.isActive ? 'Работает' : 'Остановлен'}</span>
               </div>
               
-              {/* Компактная информация о балансе */}
-              <BalanceInfo balanceInfo={balanceInfo} compact={true} />
+              {/* Компактная информация о балансе в строку */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center">
+                  <span className="text-gray-400 text-xs mr-1">USDT:</span>
+                  <span className="font-medium text-sm">{balanceInfo.usdtBalance.toFixed(4)}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-400 text-xs mr-1">PnL:</span>
+                  <span className={`font-medium text-sm ${balanceInfo.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {balanceInfo.unrealizedPnl >= 0 ? '+' : ''}{balanceInfo.unrealizedPnl.toFixed(4)}
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-gray-400 text-xs mr-1">ROI:</span>
+                  <span className={`font-medium text-sm ${balanceInfo.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {balanceInfo.roi >= 0 ? '+' : ''}{balanceInfo.roi.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -115,28 +131,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
               </NavLink>
             </li>
           </ul>
-          
-          {/* Детальная информация о балансе и статус бота в сайдбаре */}
-          <div className="absolute bottom-8 left-4 right-4 space-y-4">
-            {/* Полная информация о балансе */}
-            <BalanceInfo balanceInfo={balanceInfo} />
-            
-            {/* Информация о статусе бота */}
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <h3 className="text-xs uppercase text-gray-300 mb-2">Статус бота</h3>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm">Состояние:</span>
-                <div className={`flex items-center ${botStatus?.isActive ? 'text-green-400' : 'text-red-400'}`}>
-                  {botStatus?.isActive ? (
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                  ) : (
-                    <XOctagon className="w-4 h-4 mr-1" />
-                  )}
-                  <span className="text-sm">{botStatus?.isActive ? 'Активен' : 'Остановлен'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </nav>
         
         {/* Мобильная навигация */}
@@ -213,9 +207,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, botStatus }) => {
                 </li>
               </ul>
               
-              {/* Мобильный статус бота и баланс */}
+              {/* Мобильный компактный статус бота и баланс */}
               <div className="mt-8 space-y-4">
-                {/* Компактная информация о балансе */}
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <h3 className="text-xs uppercase text-gray-300 mb-2">Баланс</h3>
                   <div className="flex flex-col space-y-2">

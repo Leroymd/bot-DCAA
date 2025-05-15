@@ -1,4 +1,4 @@
-// client/src/pages/Dashboard.tsx - обновленная версия
+// client/src/pages/Dashboard.tsx - исправленная версия без блока статуса бота
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Bell, Settings, TrendingUp, Activity, DollarSign, Clock, 

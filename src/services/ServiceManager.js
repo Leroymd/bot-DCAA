@@ -1,4 +1,4 @@
-// src/services/ServiceManager.js
+// src/services/ServiceManager.js - исправленная версия
 // Центральный модуль для управления всеми сервисами
 
 const logger = require('../utils/logger');
@@ -63,6 +63,16 @@ class ServiceManager {
       logger.error(`ServiceManager: Ошибка при остановке сервисов: ${error.message}`);
       return false;
     }
+  }
+  
+  // ДОБАВЛЕНО: метод для получения сервиса аккаунта
+  getAccountService() {
+    return this.services.account;
+  }
+  
+  // ДОБАВЛЕНО: метод для получения сервиса статистики
+  getStatisticsService() {
+    return this.services.statistics;
   }
   
   // Получение текущего состояния бота для API
