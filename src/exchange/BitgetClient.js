@@ -834,26 +834,49 @@ async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfit
     
     const currentPrice = parseFloat(ticker.data.last);
     
-    // Проверяем и форматируем размер позиции
+    // Проверяем и форматируем размер позиции с дополнительным запасом
     let formattedSize;
     let usdtValue;
     
+    // Получаем информацию о символе для определения точности
+    const symbolInfo = await this.getSymbolInfo(symbol);
+    const pricePrecision = symbolInfo && symbolInfo.pricePrecision ? symbolInfo.pricePrecision : 4;
+    const quantityPrecision = symbolInfo && symbolInfo.quantityPrecision ? symbolInfo.quantityPrecision : 4;
+    
     // Если размер передан как строка с USDT в конце
     if (typeof size === 'string' && size.includes('USDT')) {
+      // Извлекаем числовое значение USDT
       const usdtAmount = parseFloat(size.replace('USDT', '').trim());
-      usdtValue = usdtAmount;
       
-      // Преобразуем сумму в USDT в количество контрактов
-      formattedSize = (usdtAmount / currentPrice).toFixed(4);
-      logger.info(`Преобразование ${usdtAmount} USDT в ${formattedSize} контрактов по цене ${currentPrice}`);
+      // Добавляем запас +10% к размеру для надежности
+      // (чтобы компенсировать возможные отличия в расчетах Bitget)
+      const adjustedUsdtAmount = usdtAmount * 1.1;
+      usdtValue = adjustedUsdtAmount;
+      
+      // Преобразуем сумму в USDT в количество контрактов с учетом точности
+      formattedSize = (adjustedUsdtAmount / currentPrice).toFixed(quantityPrecision);
+      logger.info(`Преобразование ${usdtAmount} USDT (скорректировано до ${adjustedUsdtAmount}) в ${formattedSize} контрактов по цене ${currentPrice}`);
     } 
     // Если передан просто размер позиции (число или строка с числом)
     else {
       const sizeNumber = parseFloat(size);
       
-      // Проверяем, достаточно ли размера позиции (в USDT)
+      // Рассчитываем стоимость в USDT
       usdtValue = sizeNumber * currentPrice;
-      formattedSize = sizeNumber.toString();
+      
+      // Если стоимость близка к минимуму, добавляем запас
+      if (usdtValue < 10) {  // Если меньше 10 USDT
+        // Рассчитываем коэффициент для достижения минимум 7 USDT (запас над 5 USDT)
+        const adjustmentFactor = Math.max(7 / usdtValue, 1.1);
+        const adjustedSize = sizeNumber * adjustmentFactor;
+        formattedSize = adjustedSize.toFixed(quantityPrecision);
+        usdtValue = adjustedSize * currentPrice;
+        
+        logger.info(`Размер увеличен с ${sizeNumber} до ${formattedSize} контрактов для гарантированного превышения минимального размера ордера`);
+      } else {
+        // Для больших ордеров просто форматируем размер
+        formattedSize = sizeNumber.toFixed(quantityPrecision);
+      }
       
       logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
     }
@@ -863,9 +886,16 @@ async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfit
       logger.error(`Размер позиции слишком мал: ${usdtValue.toFixed(2)} USDT. Минимальный размер: 5 USDT`);
       return Promise.reject(new Error(`Размер позиции должен быть не менее 5 USDT. Текущий размер: ${usdtValue.toFixed(2)} USDT`));
     }
-
-    // Получаем информацию о символе для форматирования цен
-    const symbolInfo = await this.getSymbolInfo(symbol);
+    
+    // Рассчитываем минимальный размер в контрактах (эквивалент 5 USDT)
+    const minSizeInContracts = 5 / currentPrice;
+    
+    // Проверяем, что размер в контрактах не меньше минимального
+    if (parseFloat(formattedSize) < minSizeInContracts) {
+      logger.warn(`Размер в контрактах (${formattedSize}) меньше минимального (${minSizeInContracts.toFixed(quantityPrecision)})`);
+      formattedSize = (minSizeInContracts * 1.1).toFixed(quantityPrecision); // +10% запас
+      logger.info(`Размер скорректирован до ${formattedSize} контрактов`);
+    }
     
     // Форматируем цены
     let formattedPrice = price;
@@ -897,8 +927,6 @@ async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfit
       marginMode: 'isolated',
       productType: "USDT-FUTURES"
     };
-
-    // Важно: НЕ указываем tradeSide в one-way-mode
 
     // Добавляем цену для лимитного ордера
     if (orderType.toLowerCase() === 'limit' && formattedPrice) {
@@ -1194,21 +1222,16 @@ async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfit
       // Для LONG позиции нужен SELL ордер, для SHORT - BUY ордер
       const side = formattedHoldSide === "long" ? "sell" : "buy";
       
-      // Корректно определяем tradeSide
-      const tradeSide = formattedHoldSide === "long" ? "close_long" : "close_short";
-      
       // Устанавливаем параметры для трейлинг-стопа согласно документации
       const params = {
         symbol,
         marginCoin: 'USDT',
-        planType: "trailing_stop_plan",
+        planType: "moving_plan", // ИСПРАВЛЕНО: правильное значение для трейлинг-стопа
         callbackRatio: callbackRatio.toString(),
         size: size.toString(),
         side, // Правильное значение side (sell/buy)
         triggerType: "mark_price",
         holdSide: formattedHoldSide, // В нижнем регистре
-        timeInForceValue: "normal",
-        tradeSide, // Правильное значение tradeSide
         productType: "USDT-FUTURES"
       };
       

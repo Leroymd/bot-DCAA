@@ -81,7 +81,7 @@ async updateOpenPositions() {
         
         // Проверяем возможные поля для цены входа
         let entryPrice = 0;
-        const possiblePriceFields = ['openPrice', 'openPr', 'entryPrice', 'avgPrice', 'avgPr', 'markPrice', 'markPr'];
+        const possiblePriceFields = ['openPriceAvg', 'openPrice', 'openPr', 'entryPrice', 'avgPrice', 'avgPr', 'markPrice', 'markPr'];
         
         for (const field of possiblePriceFields) {
           if (position[field] !== undefined && !isNaN(parseFloat(position[field]))) {
@@ -214,6 +214,27 @@ async updateOpenPositions() {
   } catch (error) {
     logger.error('Ошибка при обновлении открытых позиций: ' + error.message);
     return this.openPositions;
+  }
+}
+
+// Добавим метод форматирования длительности
+formatDuration(ms) {
+  try {
+    // Проверяем, что ms - это валидное число
+    if (isNaN(ms) || ms < 0) {
+      logger.warn(`Невалидное значение для форматирования длительности: ${ms}`);
+      return "00:00"; // Возвращаем значение по умолчанию для отображения
+    }
+    
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    
+    // Форматируем с ведущими нулями для единообразия
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  } catch (error) {
+    logger.error(`Ошибка при форматировании длительности: ${error.message}`);
+    return "00:00"; // В случае любой ошибки возвращаем стандартное время
   }
 }
 
