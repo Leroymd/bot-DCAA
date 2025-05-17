@@ -1,14 +1,35 @@
-// src/bot/strategy/FractalStrategy.js
+// src/bot/strategy/PureFractalStrategy.js
 const logger = require('../../utils/logger');
 
-class FractalStrategy {
+class PureFractalStrategy {
+  // Статичные/дефолтные настройки для стратегии
+  static DEFAULT_SETTINGS = {
+    fractalLookbackPeriod: 2,
+    allowShorting: true,
+    microTrendEmaPeriod: 9, // Этот параметр теперь берется из IndicatorManager.indicatorSettings
+    requireMicroTrendConfirmation: true,
+  };
+
   constructor(config, indicatorManager, positionManager) {
-    this.config = config;
+    this.config = config; // Общая конфигурация бота
     this.indicatorManager = indicatorManager;
     this.positionManager = positionManager;
     this.client = null;
-    this.signals = [];
-    this.maxSignals = 50; // Максимальное количество сигналов в истории
+    this.signalsLog = [];
+    this.maxSignalsLog = this.config.maxSignalHistory || 50;
+
+    // Используем статичные настройки стратегии
+    this.strategySettings = {
+      fractalLookbackPeriod: PureFractalStrategy.DEFAULT_SETTINGS.fractalLookbackPeriod,
+      allowShorting: PureFractalStrategy.DEFAULT_SETTINGS.allowShorting,
+      // microTrendEmaPeriod берем из indicatorSettings, так как он там рассчитывается
+      microTrendEmaPeriod: this.indicatorManager.indicatorSettings.microTrendEmaPeriod,
+      requireMicroTrendConfirmation: PureFractalStrategy.DEFAULT_SETTINGS.requireMicroTrendConfirmation,
+    };
+    logger.info(`[PureFractalStrategy] Инициализирована со статичными настройками: FractalLookback=${this.strategySettings.fractalLookbackPeriod}, AllowShorting=${this.strategySettings.allowShorting}, MicroTrendEMA=${this.strategySettings.microTrendEmaPeriod}, RequireMicroTrendConfirm=${this.strategySettings.requireMicroTrendConfirmation}`);
+
+    this.lastActionedFractalTimestamp = {};
+    this.lastDetectedFractalTimeCheckSignals = {}; // Для checkSignals, если используется отдельно
   }
 
   setClient(client) {
@@ -16,265 +37,190 @@ class FractalStrategy {
   }
 
   updateConfig(newConfig) {
-    this.config = Object.assign({}, this.config, newConfig);
+    // Обновляем общую конфигурацию, но специфичные настройки стратегии остаются статичными
+    this.config = { ...this.config, ...newConfig };
+    // Важно: если какие-то из статичных настроек все же должны быть обновляемыми через newConfig,
+    // то нужно добавить логику их слияния здесь.
+    // Сейчас предполагается, что они жестко заданы.
+    // Однако, если microTrendEmaPeriod изменился в IndicatorManager через его updateConfig,
+    // то стратегия должна это подхватить, если IndicatorManager ее уведомит или стратегия сама проверит.
+    // Проще всего, если IndicatorManager.indicatorSettings являются публичным свойством.
+    this.strategySettings.microTrendEmaPeriod = this.indicatorManager.indicatorSettings.microTrendEmaPeriod;
+    logger.info('[PureFractalStrategy] Общая конфигурация обновлена. Настройки стратегии остаются преимущественно статичными.');
   }
 
-  // Основные методы стратегии с реальной логикой
-  async execute() {
-    try {
-      // Если у бота нет клиента API, прерываем выполнение
-      if (!this.client) {
-        logger.warn('Не удалось выполнить стратегию: отсутствует клиент API');
-        return false;
-      }
+  _findRecentConfirmedFractal(symbol, fractalType, fractalsData, candles) {
+    // ... (реализация без изменений, как в предыдущем ответе)
+    const lastCandleIndex = candles.length - 1;
+    const targetFractalOriginalIndex = lastCandleIndex - this.strategySettings.fractalLookbackPeriod;
+    if (targetFractalOriginalIndex < 0) return null;
+    const sourceFractals = fractalType === 'buy' ? fractalsData.buyFractals : fractalsData.sellFractals;
+    const foundFractal = sourceFractals.find(f => f.index === targetFractalOriginalIndex);
+    if (foundFractal) {
+      const lastActionTime = this.lastActionedFractalTimestamp[symbol] || 0;
+      if (foundFractal.time > lastActionTime) return foundFractal;
+    }
+    return null;
+  }
 
-      // Проверяем количество открытых позиций
-      const openPositions = this.positionManager.getOpenPositions();
-      if (openPositions.length >= this.config.riskManagement.maxOpenPositions) {
-        logger.info('Достигнуто максимальное количество открытых позиций (' + this.config.riskManagement.maxOpenPositions + ')');
-        return false;
-      }
-
-      // Получаем все сигналы для торговых пар
-      const allSignals = [];
-      
-      for (const symbol of this.config.tradingPairs) {
-        // Проверяем, есть ли уже открытая позиция для этой пары
-        const hasOpenPosition = openPositions.some(p => p.symbol === symbol);
-        if (hasOpenPosition) continue;
-        
-        // Получаем индикаторы для анализа
-        const indicators = this.indicatorManager.getIndicators(symbol);
-        if (!indicators) continue;
-        
-        // Анализируем индикаторы и получаем сигналы
-        const signal = this.analyzeForSignals(symbol, indicators);
-        if (signal) {
-          allSignals.push(signal);
-          
-          // Добавляем сигнал в историю
-          this.addSignalToHistory(signal);
-          
-          // Если сигнал сильный, открываем позицию
-          if (signal.strength >= 70) {
-            logger.info(`Сильный сигнал (${signal.strength}) для ${symbol}: ${signal.type}`);
-            
-            const ticker = await this.client.getTicker(symbol);
-            if (!ticker || !ticker.data || !ticker.data.last) {
-              logger.warn(`Не удалось получить текущую цену для ${symbol}`);
-              continue;
-            }
-            
-            const currentPrice = parseFloat(ticker.data.last);
-            
-            // Открываем позицию
-            await this.positionManager.openPosition(
-              signal.type,
-              symbol,
-              currentPrice,
-              signal.reason,
-              signal.strength
-            );
-          }
-        }
-      }
-      
-      return allSignals.length > 0;
-    } catch (error) {
-      logger.error('Ошибка при выполнении стратегии: ' + error.message);
+  _checkMicroTrend(symbol, candles, emaShortValues, forBuySignal) {
+    // ... (реализация без изменений, как в предыдущем ответе)
+    if (!this.strategySettings.requireMicroTrendConfirmation) {
+      logger.debug(`[PureFractalStrategy._checkMicroTrend for ${symbol}] Подтверждение микротренда отключено конфигом.`);
+      return true;
+    }
+    if (!emaShortValues || emaShortValues.length < 2 || !candles || candles.length < 2) {
+      logger.warn(`[PureFractalStrategy._checkMicroTrend for ${symbol}] Недостаточно данных (EMA: ${emaShortValues?.length}, Свечи: ${candles?.length}).`);
       return false;
     }
+    const lastCandle = candles[candles.length - 1];
+    const lastEma = emaShortValues[emaShortValues.length - 1];
+    const prevEma = emaShortValues[emaShortValues.length - 2];
+    if (isNaN(lastCandle.close) || isNaN(lastCandle.open) || isNaN(lastEma) || isNaN(prevEma)) {
+        logger.warn(`[PureFractalStrategy._checkMicroTrend for ${symbol}] NaN значения в данных.`);
+        return false;
+    }
+    let confirmed = false;
+    if (forBuySignal) {
+      confirmed = lastCandle.close > lastEma && lastEma > prevEma;
+      logger.debug(`[MicroTrend BUY for ${symbol} @ ${new Date(lastCandle.time).toISOString()}] LastCl: ${lastCandle.close.toFixed(4)}, EMA(${this.strategySettings.microTrendEmaPeriod}): ${lastEma.toFixed(4)}, PrevEMA: ${prevEma.toFixed(4)}. Confirmed: ${confirmed}`);
+    } else {
+      confirmed = lastCandle.close < lastEma && lastEma < prevEma;
+      logger.debug(`[MicroTrend SELL for ${symbol} @ ${new Date(lastCandle.time).toISOString()}] LastCl: ${lastCandle.close.toFixed(4)}, EMA(${this.strategySettings.microTrendEmaPeriod}): ${lastEma.toFixed(4)}, PrevEMA: ${prevEma.toFixed(4)}. Confirmed: ${confirmed}`);
+    }
+    return confirmed;
   }
 
-  analyzeForSignals(symbol, indicators) {
-    try {
-      // Получаем необходимые данные из индикаторов
-      const { candles, ema, fractals, pacChannel } = indicators;
-      
-      if (!candles || candles.length < 20 || !ema || !fractals || !pacChannel) {
-        return null;
-      }
-      
-      const lastCandle = candles[candles.length - 1];
-      const prevCandle = candles[candles.length - 2];
-      
-      // Индексы для быстрого доступа к индикаторам
-      const last = candles.length - 1;
-      const fastEMA = ema.fast;
-      const mediumEMA = ema.medium;
-      
-      // Получаем данные PAC канала
-      const upperPAC = pacChannel.upper[last];
-      const lowerPAC = pacChannel.lower[last];
-      
-      // Проверяем различные условия для сигналов
-      
-      // СИГНАЛ 1: Фрактальный прорыв + EMA подтверждение
-      let buySignal = false;
-      let sellSignal = false;
-      let strength = 0;
-      let reason = '';
-      
-      // Проверка на покупку
-      if (fastEMA[last] > mediumEMA[last] && // Быстрая EMA выше средней (восходящий тренд)
-          lastCandle.close > upperPAC && // Цена закрытия выше верхней границы PAC канала
-          prevCandle.close <= upperPAC && // Предыдущая свеча была ниже границы (прорыв)
-          fractals.buyFractals.length > 0) { // Есть фракталы покупки
-        
-        buySignal = true;
-        strength = this.calculateSignalStrength(
-          fastEMA[last] - mediumEMA[last], // Разница между EMA
-          (lastCandle.close - upperPAC) / upperPAC * 100, // % прорыва PAC канала
-          fractals.buyFractals.length, // Количество фракталов
-          true // Направление
-        );
-        
-        reason = 'Прорыв верхней границы PAC канала + фрактальный сигнал покупки';
-      }
-      
-      // Проверка на продажу
-      else if (fastEMA[last] < mediumEMA[last] && // Быстрая EMA ниже средней (нисходящий тренд)
-               lastCandle.close < lowerPAC && // Цена закрытия ниже нижней границы PAC канала
-               prevCandle.close >= lowerPAC && // Предыдущая свеча была выше границы (прорыв)
-               fractals.sellFractals.length > 0) { // Есть фракталы продажи
-        
-        sellSignal = true;
-        strength = this.calculateSignalStrength(
-          mediumEMA[last] - fastEMA[last], // Разница между EMA
-          (lowerPAC - lastCandle.close) / lowerPAC * 100, // % прорыва PAC канала
-          fractals.sellFractals.length, // Количество фракталов
-          false // Направление
-        );
-        
-        reason = 'Прорыв нижней границы PAC канала + фрактальный сигнал продажи';
-      }
-      
-      // СИГНАЛ 2: Пуллбэк к EMA после тренда
-      else if (fastEMA[last] > mediumEMA[last] && // Восходящий тренд
-               Math.abs(lastCandle.close - fastEMA[last]) / fastEMA[last] * 100 < 0.5 && // Цена близка к быстрой EMA (пуллбэк)
-               lastCandle.low > fastEMA[last] && // Нижняя тень свечи выше быстрой EMA (отбой)
-               this.checkPullbackPattern(candles, fastEMA, true)) { // Проверка паттерна пуллбэка
-        
-        buySignal = true;
-        strength = 65 + (Math.random() * 10); // Базовая сила + случайная вариация
-        reason = 'Пуллбэк к быстрой EMA в восходящем тренде';
-      }
-      
-      else if (fastEMA[last] < mediumEMA[last] && // Нисходящий тренд
-               Math.abs(lastCandle.close - fastEMA[last]) / fastEMA[last] * 100 < 0.5 && // Цена близка к быстрой EMA (пуллбэк)
-               lastCandle.high < fastEMA[last] && // Верхняя тень свечи ниже быстрой EMA (отбой)
-               this.checkPullbackPattern(candles, fastEMA, false)) { // Проверка паттерна пуллбэка
-        
-        sellSignal = true;
-        strength = 65 + (Math.random() * 10); // Базовая сила + случайная вариация
-        reason = 'Пуллбэк к быстрой EMA в нисходящем тренде';
-      }
-      
-      // Если есть сигнал, создаем и возвращаем его
-      if (buySignal || sellSignal) {
-        const signal = {
-          pair: symbol,
-          type: buySignal ? 'BUY' : 'SELL',
-          strength: Math.round(strength),
-          time: new Date().getTime(),
-          price: lastCandle.close,
-          reason: reason,
-          status: 'pending'
-        };
-        
-        return signal;
-      }
-      
-      return null;
-    } catch (error) {
-      logger.error('Ошибка при анализе сигналов для ' + symbol + ': ' + error.message);
-      return null;
+  async execute() {
+    // ... (реализация метода execute без изменений, как в предыдущем ответе,
+    //    она уже использует this.strategySettings для своих нужд)
+    if (!this.positionManager) {
+      logger.error('[PureFractalStrategy.execute] PositionManager не инициализирован.');
+      return false;
     }
-  }
-  
-  // Вспомогательный метод для расчета силы сигнала
-  calculateSignalStrength(emaDiff, breakoutPercent, fractalCount, isBuy) {
-    // Базовая сила сигнала
-    let strength = 60;
-    
-    // Добавляем силу в зависимости от разницы EMA (тренд)
-    const normalizedEMADiff = Math.min(emaDiff * 100, 5); // Ограничиваем до 5%
-    strength += normalizedEMADiff * 2; // Максимум +10 к силе
-    
-    // Добавляем силу в зависимости от процента прорыва
-    const normalizedBreakout = Math.min(breakoutPercent, 3); // Ограничиваем до 3%
-    strength += normalizedBreakout * 3; // Максимум +9 к силе
-    
-    // Добавляем силу в зависимости от количества фракталов
-    const normalizedFractals = Math.min(fractalCount, 5); // Ограничиваем до 5
-    strength += normalizedFractals * 2; // Максимум +10 к силе
-    
-    // Добавляем случайность для вариации сигналов
-    strength += (Math.random() * 6) - 3; // От -3 до +3
-    
-    // Ограничиваем итоговую силу
-    return Math.min(Math.max(strength, 50), 95);
-  }
-  
-  // Вспомогательный метод для проверки паттерна пуллбэка
-  checkPullbackPattern(candles, ema, isBuy) {
-    const lookback = this.config.pullbackLookback || 3;
-    const last = candles.length - 1;
-    
-    if (last < lookback) return false;
-    
-    let distanceIncreasing = true;
-    
-    for (let i = 2; i <= lookback; i++) {
-      const currDistance = Math.abs(candles[last].close - ema[last]);
-      const prevDistance = Math.abs(candles[last - i].close - ema[last - i]);
-      
-      if (currDistance >= prevDistance) {
-        distanceIncreasing = false;
-        break;
-      }
-    }
-    
-    return distanceIncreasing;
-  }
+    const openPositions = this.positionManager.getOpenPositions();
+    const globalMaxOpenPositions = this.config.riskManagement?.maxOpenPositions || 1;
+    let actionsTakenThisCycle = false;
 
-  addSignalToHistory(signal) {
-    // Добавляем сигнал в историю
-    this.signals.unshift(signal);
-    
-    // Ограничиваем размер истории
-    if (this.signals.length > this.maxSignals) {
-      this.signals = this.signals.slice(0, this.maxSignals);
-    }
-  }
+    for (const symbol of this.config.tradingPairs || []) {
+      const indicators = this.indicatorManager.getIndicators(symbol);
+      if (!indicators || !indicators.candles || !indicators.fractals || !indicators.emaShort || indicators.candles.length < (this.strategySettings.fractalLookbackPeriod + 3) || indicators.emaShort.length < 2 ) {
+        logger.debug(`[PureFractalStrategy.execute] Отсутствуют/неполные индикаторы для ${symbol}. Пропускаем.`);
+        continue;
+      }
+      const currentOpenPositionForSymbol = openPositions.find(p => p.symbol === symbol && p.status !== 'closed');
+      const { candles, fractals, emaShort } = indicators;
 
-  getRecentSignals(limit) {
-    limit = limit || 5;
-    
-    const signals = this.signals.slice();
-    
-    // Конвертируем метку времени в более читаемый формат
-    const formattedSignals = signals.slice(0, limit).map(function(signal) {
-      const now = new Date().getTime();
-      const signalTime = signal.time;
-      const diffInMs = now - signalTime;
-      
-      let timeString;
-      if (diffInMs < 60000) { // меньше минуты
-        timeString = Math.floor(diffInMs / 1000) + ' сек назад';
-      } else if (diffInMs < 3600000) { // меньше часа
-        timeString = Math.floor(diffInMs / 60000) + ' мин назад';
+      if (currentOpenPositionForSymbol) {
+        let oppositeFractal = null; let microTrendConfirmedForExit = false; let actionType = '';
+        if (currentOpenPositionForSymbol.side.toLowerCase() === 'buy') {
+          oppositeFractal = this._findRecentConfirmedFractal(symbol, 'sell', fractals, candles);
+          if (oppositeFractal) { actionType = 'CLOSE_LONG_OPEN_SHORT'; microTrendConfirmedForExit = this._checkMicroTrend(symbol, candles, emaShort, false); }
+        } else if (currentOpenPositionForSymbol.side.toLowerCase() === 'sell') {
+          oppositeFractal = this._findRecentConfirmedFractal(symbol, 'buy', fractals, candles);
+          if (oppositeFractal) { actionType = 'CLOSE_SHORT_OPEN_LONG'; microTrendConfirmedForExit = this._checkMicroTrend(symbol, candles, emaShort, true); }
+        }
+
+        if (oppositeFractal && (!this.strategySettings.requireMicroTrendConfirmation || microTrendConfirmedForExit)) {
+          logger.info(`[PureFractalStrategy.execute] Для ${currentOpenPositionForSymbol.side} ${symbol} обнаружен противоположный фрактал @${oppositeFractal.price}. Микротренд подтвержден: ${microTrendConfirmedForExit}`);
+          try {
+            await this.positionManager.closePosition(symbol, currentOpenPositionForSymbol.id, `Close ${currentOpenPositionForSymbol.side} on opposite Fractal (Execute)`);
+            this.lastActionedFractalTimestamp[symbol] = oppositeFractal.time; actionsTakenThisCycle = true;
+            const updatedOpenPositions = this.positionManager.getOpenPositions().filter(p=>p.status !== 'closed');
+            if (updatedOpenPositions.length < globalMaxOpenPositions) {
+              if (actionType === 'CLOSE_LONG_OPEN_SHORT' && this.strategySettings.allowShorting) {
+                await this.positionManager.openPosition('sell', symbol, oppositeFractal.price, 'Sell Fractal (Execute, after closing long)', 100);
+              } else if (actionType === 'CLOSE_SHORT_OPEN_LONG') {
+                await this.positionManager.openPosition('buy', symbol, oppositeFractal.price, 'Buy Fractal (Execute, after closing short)', 100);
+              }
+            }
+          } catch (error) { logger.error(`[PureFractalStrategy.execute] Ошибка при реверсе ${symbol}: ${error.message}`, error.stack); }
+          continue;
+        } else if (oppositeFractal) { logger.debug(`[PureFractalStrategy.execute] Противоположный фрактал для ${symbol} есть, но микротренд НЕ подтвержден.`); }
       } else {
-        timeString = Math.floor(diffInMs / 3600000) + 'ч ' + Math.floor((diffInMs % 3600000) / 60000) + 'м назад';
+        const currentTotalOpen = openPositions.filter(p=>p.status !== 'closed').length;
+        if (currentTotalOpen >= globalMaxOpenPositions) { continue; }
+        const buyFractal = this._findRecentConfirmedFractal(symbol, 'buy', fractals, candles);
+        if (buyFractal) {
+          const microTrendBuyConfirmed = this._checkMicroTrend(symbol, candles, emaShort, true);
+          if (!this.strategySettings.requireMicroTrendConfirmation || microTrendBuyConfirmed) {
+            try {
+              await this.positionManager.openPosition('buy', symbol, buyFractal.price, 'Buy Fractal (Execute)', 100);
+              this.lastActionedFractalTimestamp[symbol] = buyFractal.time; actionsTakenThisCycle = true;
+              this.addSignalToLog({ pair: symbol, type: 'EXECUTE_OPEN_BUY', price: buyFractal.price, time: buyFractal.time, reason: 'Buy Fractal Confirmed' });
+              continue;
+            } catch (error) { logger.error(`[PureFractalStrategy.execute] Ошибка при открытии LONG ${symbol}: ${error.message}`, error.stack); }
+          } else { this.addSignalToLog({ pair: symbol, type: 'EXECUTE_BUY_FRACTAL_NO_TREND', price: buyFractal.price, time: buyFractal.time, reason: 'Buy Fractal, Microtrend Fail' }); }
+        } else if (this.strategySettings.allowShorting) {
+            const sellFractal = this._findRecentConfirmedFractal(symbol, 'sell', fractals, candles);
+            if (sellFractal) {
+                const microTrendSellConfirmed = this._checkMicroTrend(symbol, candles, emaShort, false);
+                if (!this.strategySettings.requireMicroTrendConfirmation || microTrendSellConfirmed) {
+                    try {
+                        await this.positionManager.openPosition('sell', symbol, sellFractal.price, 'Sell Fractal (Execute)', 100);
+                        this.lastActionedFractalTimestamp[symbol] = sellFractal.time; actionsTakenThisCycle = true;
+                        this.addSignalToLog({ pair: symbol, type: 'EXECUTE_OPEN_SELL', price: sellFractal.price, time: sellFractal.time, reason: 'Sell Fractal Confirmed' });
+                        continue;
+                    } catch (error) { logger.error(`[PureFractalStrategy.execute] Ошибка при открытии SHORT ${symbol}: ${error.message}`, error.stack); }
+                } else { this.addSignalToLog({ pair: symbol, type: 'EXECUTE_SELL_FRACTAL_NO_TREND', price: sellFractal.price, time: sellFractal.time, reason: 'Sell Fractal, Microtrend Fail' });}
+            }
+        }
       }
-      
-      return Object.assign({}, signal, {
-        time: timeString
-      });
+    }
+    return actionsTakenThisCycle;
+  }
+
+  async checkSignals(symbol, currentPriceContext) {
+    // ... (реализация без изменений, как в предыдущем ответе)
+    const indicators = this.indicatorManager.getIndicators(symbol);
+    if (!indicators || !indicators.candles || !indicators.fractals || !indicators.emaShort || indicators.candles.length < (this.strategySettings.fractalLookbackPeriod + 3) || indicators.emaShort.length < 2) {
+      return null;
+    }
+    const { candles, fractals, emaShort } = indicators;
+    const buyDetectKey = `${symbol}_BUY_DETECT_CS`;
+    const lastDetectedBuyTime = this.lastDetectedFractalTimeCheckSignals ? (this.lastDetectedFractalTimeCheckSignals[buyDetectKey] || 0) : 0;
+    const buyFractal = fractals.buyFractals.find(f => f.index === (candles.length - 1 - this.strategySettings.fractalLookbackPeriod) && f.time > lastDetectedBuyTime);
+    if (buyFractal) {
+        const microTrendOk = this._checkMicroTrend(symbol, candles, emaShort, true);
+        const signal = { symbol: symbol, type: 'BUY_FRACTAL', price: buyFractal.price, time: buyFractal.time, reason: `Pure Buy Fractal (MicroTrend: ${microTrendOk ? 'OK' : 'Fail'})`, strength: microTrendOk ? 100 : 50 };
+        this.addSignalToLog(signal);
+        if(this.lastDetectedFractalTimeCheckSignals) this.lastDetectedFractalTimeCheckSignals[buyDetectKey] = buyFractal.time;
+        return signal;
+    }
+    const sellDetectKey = `${symbol}_SELL_DETECT_CS`;
+    const lastDetectedSellTime = this.lastDetectedFractalTimeCheckSignals ? (this.lastDetectedFractalTimeCheckSignals[sellDetectKey] || 0) : 0;
+    const sellFractal = fractals.sellFractals.find(f => f.index === (candles.length - 1 - this.strategySettings.fractalLookbackPeriod) && f.time > lastDetectedSellTime);
+    if (sellFractal) {
+        const microTrendOk = this._checkMicroTrend(symbol, candles, emaShort, false);
+        const signal = { symbol: symbol, type: 'SELL_FRACTAL', price: sellFractal.price, time: sellFractal.time, reason: `Pure Sell Fractal (MicroTrend: ${microTrendOk ? 'OK' : 'Fail'})`, strength: microTrendOk ? 100 : 50 };
+        this.addSignalToLog(signal);
+        if(this.lastDetectedFractalTimeCheckSignals) this.lastDetectedFractalTimeCheckSignals[sellDetectKey] = sellFractal.time;
+        return signal;
+    }
+    return null;
+  }
+
+  addSignalToLog(signalEntry) {
+    // ... (реализация без изменений)
+    this.signalsLog.unshift(signalEntry);
+    if (this.signalsLog.length > this.maxSignalsLog) {
+      this.signalsLog.pop();
+    }
+  }
+
+  getRecentSignals(limit = 5) {
+    // ... (реализация без изменений)
+    const recentLogs = this.signalsLog.slice(0, limit);
+    return recentLogs.map(logEntry => {
+      const now = new Date().getTime(); const signalTime = logEntry.time; const diffInMs = now - signalTime;
+      let timeString;
+      if (diffInMs < 60000) { timeString = `${Math.floor(diffInMs / 1000)} сек назад`; }
+      else if (diffInMs < 3600000) { timeString = `${Math.floor(diffInMs / 60000)} мин назад`; }
+      else if (diffInMs < 86400000) { timeString = `${Math.floor(diffInMs / 3600000)}ч ${Math.floor((diffInMs % 3600000) / 60000)}м назад`; }
+      else { timeString = new Date(signalTime).toLocaleString(); }
+      return { ...logEntry, timeAgo: timeString, originalTime: new Date(signalTime).toISOString() };
     });
-    
-    return formattedSignals;
   }
 }
 
-module.exports = FractalStrategy;
+module.exports = PureFractalStrategy;

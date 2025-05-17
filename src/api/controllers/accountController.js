@@ -5,7 +5,7 @@ const serviceManager = require('../../services/ServiceManager');
 exports.getBalance = async function(req, res) {
   try {
     // Получаем информацию о балансе от сервиса аккаунта
-    const balanceInfo = await serviceManager.getAccountService().getBalanceInfo();
+    const metrics = serviceManager.getAccountService().getPerformanceMetrics();
     
     if (!balanceInfo) {
       return res.status(404).json({

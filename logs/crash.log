@@ -46,3 +46,194 @@ Error: Route.get() requires a callback function but got a [object Undefined]
     at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
     at Module.require (node:internal/modules/cjs/loader:1491:12)
 
+2025-05-12T20:10:11.495Z Uncaught Exception: Unexpected identifier 'closePosition'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:310
+  async closePosition(positionId, percentage) {
+        ^^^^^^^^^^^^^
+
+SyntaxError: Unexpected identifier 'closePosition'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-12T20:12:56.801Z Uncaught Exception: Unexpected identifier 'closePosition'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:310
+  async closePosition(positionId, percentage) {
+        ^^^^^^^^^^^^^
+
+SyntaxError: Unexpected identifier 'closePosition'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-13T13:16:35.002Z Uncaught Exception: Cannot find module '../utils/logger'
+Require stack:
+- C:\Users\leroy\Desktop\bot-DCA\src\api\controllers\positionController.js
+- C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js
+- C:\Users\leroy\Desktop\bot-DCA\app.js
+Error: Cannot find module '../utils/logger'
+Require stack:
+- C:\Users\leroy\Desktop\bot-DCA\src\api\controllers\positionController.js
+- C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js
+- C:\Users\leroy\Desktop\bot-DCA\app.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Module._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\controllers\positionController.js:3:16)
+    at Module._compile (node:internal/modules/cjs/loader:1734:14)
+
+2025-05-13T15:17:01.942Z Uncaught Exception: Unexpected token ':'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:11
+  } :antCitation[]{citations="401a798d-3de6-4d3b-8134-011744e4d2e1"}
+    ^
+
+SyntaxError: Unexpected token ':'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-13T23:40:32.085Z Uncaught Exception: Invalid regular expression: missing /
+C:\Users\leroy\Desktop\bot-DCA\src\api\controllers\positionController.js:124
+/ Обновленный метод closePosition в positionController.js
+^
+
+SyntaxError: Invalid regular expression: missing /
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js:3:28)
+
+2025-05-14T01:08:21.956Z Uncaught Exception: Invalid regular expression: missing /
+C:\Users\leroy\Desktop\bot-DCA\src\api\controllers\positionController.js:124
+/ Обновленный метод closePosition в positionController.js
+^
+
+SyntaxError: Invalid regular expression: missing /
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js:3:28)
+
+2025-05-14T01:13:14.576Z Uncaught Exception: Unexpected token '{'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:21
+  setClient(client) {
+                    ^
+
+SyntaxError: Unexpected token '{'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-14T01:14:15.196Z Uncaught Exception: Unexpected token '{'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:21
+  setClient(client) {
+                    ^
+
+SyntaxError: Unexpected token '{'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-14T01:17:10.964Z Uncaught Exception: Unexpected token '{'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:21
+  setClient(client) {
+                    ^
+
+SyntaxError: Unexpected token '{'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-14T01:19:40.092Z Uncaught Exception: Unexpected token '{'
+C:\Users\leroy\Desktop\bot-DCA\src\bot\PositionManager.js:21
+  setClient(client) {
+                    ^
+
+SyntaxError: Unexpected token '{'
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\bot\TradingBot.js:4:25)
+
+2025-05-14T01:25:11.119Z Uncaught Exception: Invalid regular expression: missing /
+C:\Users\leroy\Desktop\bot-DCA\src\api\controllers\positionController.js:124
+/ Обновленный метод closePosition в positionController.js
+^
+
+SyntaxError: Invalid regular expression: missing /
+    at wrapSafe (node:internal/modules/cjs/loader:1666:18)
+    at Module._compile (node:internal/modules/cjs/loader:1708:20)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\leroy\Desktop\bot-DCA\src\api\routes\positionRoutes.js:3:28)
+

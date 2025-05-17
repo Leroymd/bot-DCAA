@@ -824,78 +824,59 @@ async placeOrderWithTpSl(symbol, side, orderType, size, price = null, takeProfit
     logger.error(`Неверное значение стороны: ${side}`);
     return Promise.reject(new Error(`Неверное значение стороны: ${side}`));
   }
-
-  try {
+try {
     // Получаем текущую цену
-    const ticker = await this.getTicker(symbol);
+   const ticker = await this.getTicker(symbol);
     if (!ticker || !ticker.data || !ticker.data.last) {
-      return Promise.reject(new Error(`Не удалось получить текущую цену для ${symbol}`));
+        throw new Error(`Не удалось получить текущую цену для ${symbol}`);
     }
-    
     const currentPrice = parseFloat(ticker.data.last);
-    
-    // Проверяем и форматируем размер позиции с дополнительным запасом
+
     let formattedSize;
     let usdtValue;
-    
-    // Получаем информацию о символе для определения точности
     const symbolInfo = await this.getSymbolInfo(symbol);
-    const pricePrecision = symbolInfo && symbolInfo.pricePrecision ? symbolInfo.pricePrecision : 4;
-    const quantityPrecision = symbolInfo && symbolInfo.quantityPrecision ? symbolInfo.quantityPrecision : 4;
-    
-    // Если размер передан как строка с USDT в конце
-    if (typeof size === 'string' && size.includes('USDT')) {
-      // Извлекаем числовое значение USDT
-      const usdtAmount = parseFloat(size.replace('USDT', '').trim());
-      
-      // Добавляем запас +10% к размеру для надежности
-      // (чтобы компенсировать возможные отличия в расчетах Bitget)
-      const adjustedUsdtAmount = usdtAmount * 1.1;
-      usdtValue = adjustedUsdtAmount;
-      
-      // Преобразуем сумму в USDT в количество контрактов с учетом точности
-      formattedSize = (adjustedUsdtAmount / currentPrice).toFixed(quantityPrecision);
-      logger.info(`Преобразование ${usdtAmount} USDT (скорректировано до ${adjustedUsdtAmount}) в ${formattedSize} контрактов по цене ${currentPrice}`);
-    } 
-    // Если передан просто размер позиции (число или строка с числом)
-    else {
-      const sizeNumber = parseFloat(size);
-      
-      // Рассчитываем стоимость в USDT
-      usdtValue = sizeNumber * currentPrice;
-      
-      // Если стоимость близка к минимуму, добавляем запас
-      if (usdtValue < 10) {  // Если меньше 10 USDT
-        // Рассчитываем коэффициент для достижения минимум 7 USDT (запас над 5 USDT)
-        const adjustmentFactor = Math.max(7 / usdtValue, 1.1);
-        const adjustedSize = sizeNumber * adjustmentFactor;
-        formattedSize = adjustedSize.toFixed(quantityPrecision);
-        usdtValue = adjustedSize * currentPrice;
-        
-        logger.info(`Размер увеличен с ${sizeNumber} до ${formattedSize} контрактов для гарантированного превышения минимального размера ордера`);
-      } else {
-        // Для больших ордеров просто форматируем размер
-        formattedSize = sizeNumber.toFixed(quantityPrecision);
-      }
-      
-      logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
+    const quantityPrecision = symbolInfo?.quantityPrecision || 4; // Default to 4
+
+    if (typeof size === 'string' && size.toUpperCase().includes('USDT')) {
+        const usdtAmount = parseFloat(size.toUpperCase().replace('USDT', '').trim());
+        usdtValue = usdtAmount;
+        if (currentPrice > 0) {
+            formattedSize = (usdtAmount / currentPrice).toFixed(quantityPrecision);
+        } else {
+            throw new Error('Текущая цена равна нулю, невозможно рассчитать размер контракта.');
+        }
+        if (usdtAmount < 5) {
+            // Вместо ошибки, можно скорректировать до минимального, если такое поведение предпочтительнее
+            // Но API обычно возвращает ошибку, так что лучше передать как есть или отклонить заранее.
+            logger.warn(`Размер ордера ${usdtAmount} USDT меньше минимального (5 USDT). Ордер может быть отклонен биржей.`);
+            // throw new Error(`Размер ордера должен быть не менее 5 USDT. Текущий размер: ${usdtAmount} USDT`);
+        }
+    } else if (!isNaN(parseFloat(size))) {
+        const sizeValue = parseFloat(size);
+        usdtValue = sizeValue * currentPrice;
+        formattedSize = sizeValue.toFixed(quantityPrecision);
+
+        if (usdtValue < 5) {
+            logger.warn(`Стоимость позиции (${usdtValue.toFixed(2)} USDT) меньше минимальной (5 USDT). Ордер может быть отклонен биржей.`);
+            // Можно скорректировать размер до минимальных 5 USDT в контрактах:
+            // if (currentPrice > 0) {
+            //   formattedSize = (5 / currentPrice).toFixed(quantityPrecision);
+            //   logger.warn(`Размер позиции скорректирован до минимального: ${formattedSize} контрактов (~5 USDT)`);
+            //   usdtValue = 5; // Обновляем usdtValue для информации
+            // } else {
+            //   throw new Error('Текущая цена равна нулю, невозможно рассчитать минимальный размер контракта.');
+            // }
+        }
+    } else {
+        throw new Error(`Некорректный формат размера позиции: ${size}`);
     }
+
+    logger.info(`Размер позиции: ${formattedSize} контрактов, примерная стоимость: ${usdtValue.toFixed(2)} USDT`);
     
-    // Проверка минимального размера (5 USDT)
-    if (usdtValue < 5) {
-      logger.error(`Размер позиции слишком мал: ${usdtValue.toFixed(2)} USDT. Минимальный размер: 5 USDT`);
-      return Promise.reject(new Error(`Размер позиции должен быть не менее 5 USDT. Текущий размер: ${usdtValue.toFixed(2)} USDT`));
-    }
-    
-    // Рассчитываем минимальный размер в контрактах (эквивалент 5 USDT)
-    const minSizeInContracts = 5 / currentPrice;
-    
-    // Проверяем, что размер в контрактах не меньше минимального
-    if (parseFloat(formattedSize) < minSizeInContracts) {
-      logger.warn(`Размер в контрактах (${formattedSize}) меньше минимального (${minSizeInContracts.toFixed(quantityPrecision)})`);
-      formattedSize = (minSizeInContracts * 1.1).toFixed(quantityPrecision); // +10% запас
-      logger.info(`Размер скорректирован до ${formattedSize} контрактов`);
-    }
+    // *** ОШИБКА БЫЛА ЗДЕСЬ: 'return formattedSize;' УДАЛЕНО ***
+
+  
+
     
     // Форматируем цены
     let formattedPrice = price;
